@@ -87,9 +87,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	 
 	RtlInitUnicodeString(&usDriverName, L"\\Device\\DriverSSDT");
 	RtlInitUnicodeString(&usDosDeviceName, L"\\DosDevices\\DriverSSDT"); 
-	RtlInitUnicodeString(&blacklist[0], L"VBoxService.exe");
-	RtlInitUnicodeString(&blacklist[1], L"logs_dispatcher.exe");
-	RtlInitUnicodeString(&blacklist[2], L"python.exe");
 
 	status = IoCreateDevice(pDriverObject, 0, &usDriverName, FILE_DEVICE_UNKNOWN, 0, FALSE, &pDeviceObject);
 	pDeviceObject->Flags |= DO_BUFFERED_IO;
@@ -109,6 +106,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	}
 
 	monitored_process_list = NULL;
+	hidden_process_list = NULL;
 	
    	status = FltRegisterFilter(pDriverObject,&registration,&filter);
 	if(NT_SUCCESS(status))
@@ -166,6 +164,7 @@ VOID Unload(PDRIVER_OBJECT pDriverObject)
 	IoDeleteDevice(pDriverObject->DeviceObject);
 	
 	cleanMonitoredProcessList();	
+	cleanHiddenProcessList();
 }
  
  

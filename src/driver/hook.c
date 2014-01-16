@@ -252,23 +252,20 @@ NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 			status = getProcNameByPID(remotePid, &remoteProc);
 			if(NT_SUCCESS(status))
 			{
-				for(i=0; i<NUMBER_PROCESSES_TO_HIDE; i++)
+				if(isProcessHiddenByPid(remotePid))	// hide process
 				{
-					if(wcsistr(remoteProc.Buffer, blacklist[i].Buffer))	// hide process
+					parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+					if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,-1,ss,ProcessName->%wZ,PID->%d", &remoteProc, remotePid)))
 					{
-						parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
-						if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,-1,ss,ProcessName->%wZ,PID->%d", &remoteProc, remotePid)))
-						{
-							sendLogs(currentProc, L"ZwOpenProcess", parameter);
-							ExFreePool(parameter);
-						}
-						else
-							sendLogs(currentProc, L"ZwOpenProcess", L"0,-1,ss,ProcessName->Error_HIDDEN,PID->-1");
-						
-						ExFreePool(remoteProc.Buffer);
-						return STATUS_INVALID_PARAMETER;
+						sendLogs(currentProc, L"ZwOpenProcess", parameter);
+						ExFreePool(parameter);
 					}
-				}
+					else
+						sendLogs(currentProc, L"ZwOpenProcess", L"0,-1,ss,ProcessName->Error_HIDDEN,PID->-1");
+					
+					ExFreePool(remoteProc.Buffer);
+					return STATUS_INVALID_PARAMETER;
+				}			
 				
 				statusCall = ((ZWOPENPROCESS)(oldZwOpenProcess))(ProcessHandle, DesiredAccess, ObjectAttributes, ClientID);
 				
@@ -351,9 +348,8 @@ NTSTATUS newZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationC
 				
 				while(pSystemProcessInformation->NextEntryOffset)
 				{
-					for(i=0; i<NUMBER_PROCESSES_TO_HIDE; i++)
-						if(RtlEqualUnicodeString(&pSystemProcessInformation->ImageName, &blacklist[i], TRUE))
-							pPrev->NextEntryOffset += pSystemProcessInformation->NextEntryOffset;	// unlinking hidden process
+					if(isProcessHiddenByPid((ULONG)pSystemProcessInformation->ProcessId))
+						pPrev->NextEntryOffset += pSystemProcessInformation->NextEntryOffset;	// unlinking hidden process
 
 					pPrev = pSystemProcessInformation;
 					// next entry

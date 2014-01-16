@@ -42,7 +42,6 @@
 #include <ntstrsafe.h>
 
 
-
 /////////////////////////////////////////////////////////////////////////////
 // DEFINES
 /////////////////////////////////////////////////////////////////////////////
@@ -63,7 +62,6 @@
 				
 // Generic defines
 #define MAXSIZE 			1024
-#define NUMBER_PROCESSES_TO_HIDE 	3
 #define ObjectNameInformation 		1
 
 // log mode
@@ -80,8 +78,6 @@
 // GLOBALS 
 /////////////////////////////////////////////////////////////////////////////
 
-// hidden processes list
-UNICODE_STRING blacklist[NUMBER_PROCESSES_TO_HIDE];
 
 // registry callback cookie
 LARGE_INTEGER cookie;

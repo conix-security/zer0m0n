@@ -69,6 +69,40 @@ NTSTATUS startMonitoringProcess(ULONG new_pid)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
+//		Adds "pid" process in the hidden processes list.
+//	Parameters :
+//		_in_ ULONG pid : Process Identifier.
+//	Return value :
+//		NTSTATUS : STATUS_SUCCESS if no error was encountered, otherwise, relevant NTSTATUS code.
+//	Process :
+//		Checks if the PID is not on the list. If not, add it to the linked list.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS addHiddenProcess(ULONG new_pid)
+{
+	PHIDDEN_PROCESS new_entry;
+	if(new_pid == 0)
+		return -1;
+	if(isProcessHiddenByPid(new_pid))
+		return STATUS_SUCCESS;
+	
+	new_entry = (PHIDDEN_PROCESS)ExAllocatePoolWithTag(NonPagedPool,sizeof(HIDDEN_PROCESS),MONIT_POOL_TAG);
+	
+	if(new_entry == NULL)
+		return -1;
+		
+	new_entry->pid = new_pid;
+	new_entry->flink = hidden_process_list;
+	hidden_process_list = new_entry;
+	
+	#ifdef DEBUG
+	DbgPrint("(DRIVER_SSDT) Hide process : %d\n", new_entry->pid);
+	#endif
+	
+	return STATUS_SUCCESS;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
 //		Removes "pid" from the monitored list (stops monitoring this process).
 //	Parameters :
 //		_in_ ULONG pid : Process Identifier.
@@ -146,13 +180,42 @@ NTSTATUS cleanMonitoredProcessList()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
+//		Removes all of the hidden processes list entries.
+//	Parameters :
+//		None
+//	Return value :
+//	Process :
+//		Walks through the linked list and removes each entry.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS cleanHiddenProcessList()
+{
+	PHIDDEN_PROCESS currentMember, tempMember;
+	
+	if(hidden_process_list == NULL)
+		return STATUS_SUCCESS;
+	
+	currentMember = hidden_process_list;
+	tempMember = NULL;
+	while(currentMember != NULL)
+	{
+		tempMember = currentMember;
+		currentMember = (PHIDDEN_PROCESS)(currentMember->flink);
+		ExFreePoolWithTag(tempMember,MONIT_POOL_TAG);
+	}
+	
+	hidden_process_list = NULL;
+	return STATUS_SUCCESS;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
 //		Returns TRUE if pid is in the monitored list (if it is actually monitored).
 //	Parameters :
 //		_in_ ULONG pid : Process Identifier.
 //	Return value :
 //		BOOLEAN : TRUE if found, FALSE if not.
 //	Process :
-//		Walks through the linked list, returns TRUE if "pid" is found.
+//		Walks through the linked list, eturns TRUE if "pid" is found.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 BOOLEAN isProcessMonitoredByPid(ULONG pid)
 {
@@ -173,3 +236,32 @@ BOOLEAN isProcessMonitoredByPid(ULONG pid)
 	return FALSE;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Returns TRUE if pid is in the hidden processes list.
+//	Parameters :
+//		_in_ ULONG pid : Process Identifier.
+//	Return value :
+//		BOOLEAN : TRUE if found, FALSE if not.
+//	Process :
+//		Walks through the linked list, eturns TRUE if "pid" is found.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+BOOLEAN isProcessHiddenByPid(ULONG pid)
+{
+	PHIDDEN_PROCESS ptr;
+	
+	if(pid == 0)
+		return FALSE;
+		
+	ptr = hidden_process_list;
+	while(ptr != NULL)
+	{
+		if(ptr->pid == pid)
+			return TRUE;
+		
+		ptr = (PHIDDEN_PROCESS)(ptr->flink);
+	}
+	
+	return FALSE;
+
+}

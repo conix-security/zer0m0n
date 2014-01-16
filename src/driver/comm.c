@@ -140,6 +140,72 @@ NTSTATUS ioctl_NotSupported(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	return STATUS_SUCCESS;
 }
 
+NTSTATUS parse_pids(PCHAR pids)
+{
+	PCHAR start,current,data;
+	ULONG len, pid;
+	BOOLEAN first_pid=TRUE;
+	NTSTATUS status;
+
+	DbgPrint("debut parse_pids, pids : %s\n", pids);
+	
+	RtlStringCbLengthA(pids, MAXSIZE, &len);
+	data = ExAllocatePoolWithTag(NonPagedPool, len+1, TEMP_TAG);
+	if(data == NULL)
+		return -1;
+	DbgPrint("avant RtlStringCbPrintfA\n");
+	if(!NT_SUCCESS(RtlStringCbPrintfA(data, len+1, "%s", pids)))
+	{
+		ExFreePool(data);
+		return -1;
+	}
+	
+	start = data;
+	current = data;
+	
+	DbgPrint("avant *current != 0x00\n");
+	while(*current != 0x00)
+	{
+		if(*current == '_' && current!=start)
+		{
+			*current = 0x00;
+			DbgPrint("start : %s\n", start);
+			status = RtlCharToInteger(start, 10, &pid);
+			if(NT_SUCCESS(status) && pid!=0)
+			{
+				if(first_pid)
+				{
+					startMonitoringProcess(pid);
+					first_pid=FALSE;
+				}
+				else
+					addHiddenProcess(pid);
+			}
+			start = current+1;
+		}
+		current++;
+	}
+	
+	if(start != current)
+	{
+		DbgPrint("start : %s\n", start);
+		status = RtlCharToInteger(start, 10, &pid);
+		DbgPrint("pid : %d\n", pid);
+		if(NT_SUCCESS(status) && pid!=0)
+		{
+			if(first_pid)
+				startMonitoringProcess(pid);
+			else
+				addHiddenProcess(pid);
+		}	
+	}
+	
+	DbgPrint("apres le while\n");
+	ExFreePool(data);
+	
+	return STATUS_SUCCESS;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
 //		DEVICE_IO_CONTROL IRP handler. Used for getting the monitored process PID.
@@ -171,13 +237,12 @@ NTSTATUS ioctl_DeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	{
 		case IOCTL_PID:
 			#ifdef DEBUG
-			DbgPrint("IOCTL_PID received !\n");
+			DbgPrint("IOCTL_PID received : %s!\n", Irp->AssociatedIrp.SystemBuffer);
 			#endif DEBUG
 							
-			status = RtlCharToInteger(Irp->AssociatedIrp.SystemBuffer, 10, &pid);
-			if(NT_SUCCESS(status))
-				status = startMonitoringProcess(pid);
-			
+			// parse the pids received from cuckoo
+			status = parse_pids(Irp->AssociatedIrp.SystemBuffer);
+		
 			Irp->IoStatus.Status = status;
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);
 			
