@@ -44,7 +44,7 @@ To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo 
 
 9- Snapshot the VM
 
-While submitting a new analysis, choose "kernelland" option on the Web interface, or use the option "analyse_kernel=yes" on commandline.
+While submitting a new analysis, choose "kernelland" option on the Web interface, or use the option "kernel_analysis=yes" on commandline.
 
 COMPILATION
 ===========
@@ -81,7 +81,6 @@ TODO LIST
 It's a first release, and there are still a lof of improvements to do and features to implement.
 Here is a list of such improvements to come :
 
-- add "kernelland" option to command-line submitting (actually only supported by the web interface)
 - anti detection features :
  	+ anti-vm detection* (cuckoo & virtual machine related files/processes/registry/connections)
 	+ process hiding using PID (actually performed using process names)
