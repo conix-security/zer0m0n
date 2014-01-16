@@ -57,7 +57,7 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
              return False
  
 -    def inject(self, dll=None, apc=False):
-+    def inject(self, dll=None, apc=False, analyse_kernel=False):
++    def inject(self, dll=None, apc=False, kernel_analysis=False):
          """Cuckoo DLL injection.
          @param dll: Cuckoo DLL path.
          @param apc: APC use.
@@ -70,7 +70,7 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
 -        if not dll or not os.path.exists(dll):
 -            log.warning("No valid DLL specified to be injected in process "
 +        """ send pid to kernel driver """
-+        if analyse_kernel == True:
++        if kernel_analysis == True:
 +            global pid_sent
 +            if pid_sent == 0:
 +                print "Kernel analysis"
@@ -92,7 +92,7 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
 +
 +
 +        """ cuckoomon ! """
-+        if analyse_kernel == False:
++        if kernel_analysis == False:
 +            print "userland analysis"
 +
 +            global kill_proc
@@ -262,7 +262,7 @@ diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/window
          free = self.options.get("free", False)
          args = self.options.get("arguments", None)
          dll = self.options.get("dll", None)
-+        analyse_kernel = self.options.get("analyse_kernel", False)
++        kernel_analysis = self.options.get("kernel_analysis", False)
          suspended = True
          if free:
              suspended = False
@@ -271,8 +271,8 @@ diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/window
  
          if not free and suspended:
 -            p.inject(dll)
-+            if analyse_kernel:
-+                p.inject(dll,apc=False,analyse_kernel=True)
++            if kernel_analysis:
++                p.inject(dll,apc=False,kernel_analysis=True)
 +            else:
 +                p.inject(dll)
              p.resume()
@@ -285,7 +285,7 @@ diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/wi
      def start(self, path):
          free = self.options.get("free", False)
          dll = self.options.get("dll", None)
-+        analyse_kernel = self.options.get("analyse_kernel", False)
++        kernel_analysis = self.options.get("kernel_analysis", False)
          suspended = True
          if free:
              suspended = False
@@ -294,8 +294,8 @@ diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/wi
  
          if not free and suspended:
 -            p.inject(dll)
-+            if analyse_kernel:
-+                p.inject(dll,apc=False,analyse_kernel=True)
++            if kernel_analysis:
++                p.inject(dll,apc=False,kernel_analysis=True)
 +            else:
 +                p.inject(dll)
              p.resume()
@@ -499,7 +499,7 @@ diff -rupN original/web/submission/views.py new/web/submission/views.py
 +        if analyse == 2:
 +            if options:
 +                options += "&"
-+            options += "analyse_kernel=yes"    
++            options += "kernel_analysis=yes"    
 +
          if "sample" in request.FILES:
              # Preventive checks.
