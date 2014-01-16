@@ -51,6 +51,7 @@ FAQ
 Q: Which injections techniques are handled by the driver ?
 
 A: Known injection techniques are:
+
     - Process memory modification techniques (ZwWriteVirtualMemory, ZwMapViewOfSection)
     - Debugging techniques (ZwSetContextThread, ZwDebugActiveProcess)
     - New process/thread creation (ZwCreateProcess, ZwCreateThread)
@@ -58,6 +59,7 @@ A: Known injection techniques are:
 Q: How do you "hide" cuckoo ?
 
 A: For now, several processes are hidden/blocked, by pid filtering:
+
     - "python.exe" (cuckoo processes)
     - "logs_dispatcher.exe" (userland app)
 
