@@ -1,0 +1,549 @@
+diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.py
+--- original/analyzer/windows/analyzer.py	2014-01-09 15:47:54.000000000 +0100
++++ new/analyzer/windows/analyzer.py	2014-01-14 18:22:32.872449095 +0100
+@@ -221,6 +221,26 @@ class PipeHandler(Thread):
+                 else:
+                     response = hookdll_encode(url_dlls)
+ 
++            # same than below but we don't want to inject any DLLs because
++            # it's a kernel analysis
++            elif command.startswith("KPROCESS:"):
++                PROCESS_LOCK.acquire()
++                data = command[9:]
++                process_id = int(data)
++                thread_id = None
++                if process_id:
++                    if process_id not in (PID, PPID):
++                        if process_id not in PROCESS_LIST:
++                            proc = Process(pid=process_id,thread_id=thread_id)
++                            filepath = proc.get_filepath()
++                            filename = os.path.basename(filepath)
++
++                            if not protected_filename(filename):
++                                add_pids(process_id)
++                                log.info("Announce process name : %s", filename)
++                PROCESS_LOCK.release()                
++
++
+             # In case of PID, the client is trying to notify the creation of
+             # a new process to be injected and monitored.
+             elif command.startswith("PROCESS:"):
+diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib/api/process.py
+--- original/analyzer/windows/lib/api/process.py	2014-01-09 15:47:54.000000000 +0100
++++ new/analyzer/windows/lib/api/process.py	2014-01-14 18:22:32.939115758 +0100
+@@ -5,6 +5,8 @@
+ import os
+ import logging
+ import random
++import win32file
++import win32api
+ from time import time
+ from ctypes import byref, c_ulong, create_string_buffer, c_int, sizeof
+ from shutil import copy
+@@ -21,6 +23,11 @@ from lib.common.rand import random_strin
+ from lib.common.results import NetlogFile
+ from lib.core.config import Config
+ 
++IOCTL_PID = 0x222008
++PATH_KERNEL_DRIVER = "\\\\.\\DriverSSDT"
++pid_sent = 0
++kill_proc = 0
++
+ log = logging.getLogger(__name__)
+ 
+ def randomize_dll(dll_path):
+@@ -260,7 +267,7 @@ class Process:
+             log.error("Failed to terminate process with pid %d", self.pid)
+             return False
+ 
+-    def inject(self, dll=None, apc=False):
++    def inject(self, dll=None, apc=False, analyse_kernel=False):
+         """Cuckoo DLL injection.
+         @param dll: Cuckoo DLL path.
+         @param apc: APC use.
+@@ -277,103 +284,135 @@ class Process:
+         if not dll:
+             dll = "cuckoomon.dll"
+ 
+-        dll = randomize_dll(os.path.join("dll", dll))
+ 
+-        if not dll or not os.path.exists(dll):
+-            log.warning("No valid DLL specified to be injected in process "
++        """ send pid to kernel driver """
++        if analyse_kernel == True:
++            global pid_sent
++            if pid_sent == 0:
++                print "Kernel analysis"
++                config_path = os.path.join(os.getenv("TEMP"), "%s.ini" % self.pid)
++                with open(config_path, "w") as config:
++                    cfg = Config("analysis.conf")
++
++                    config.write("host-ip={0}\n".format(cfg.ip))
++                    config.write("host-port={0}\n".format(cfg.port))
++                    config.write("pipe={0}\n".format(PIPE))
++
++                hFile = win32file.CreateFile(PATH_KERNEL_DRIVER, win32file.GENERIC_READ|win32file.GENERIC_WRITE,
++                                         0, None, win32file.OPEN_EXISTING, 0, None)
++                if hFile:
++                    win32file.DeviceIoControl(hFile, IOCTL_PID, str(self.pid), None)
++                    pid_sent = 1
++                else:
++                    log.warning("Failed to access kernel driver")
++
++
++        """ cuckoomon ! """
++        if analyse_kernel == False:
++            print "userland analysis"
++
++            global kill_proc
++            if kill_proc == 0:
++                os.system('taskkill /f /im sendLogs.exe')
++                kill_proc = 1
++
++            dll = randomize_dll(os.path.join("dll", dll))
++
++
++            if not dll or not os.path.exists(dll):
++                log.warning("No valid DLL specified to be injected in process "
+                         "with pid %d, injection aborted", self.pid)
+-            return False
++                return False
+ 
+-        arg = KERNEL32.VirtualAllocEx(self.h_process,
++            arg = KERNEL32.VirtualAllocEx(self.h_process,
+                                       None,
+                                       len(dll) + 1,
+                                       MEM_RESERVE | MEM_COMMIT,
+                                       PAGE_READWRITE)
+ 
+-        if not arg:
+-            log.error("VirtualAllocEx failed when injecting process with "
++            if not arg:
++                log.error("VirtualAllocEx failed when injecting process with "
+                       "pid %d, injection aborted (Error: %s)",
+                       self.pid, get_error_string(KERNEL32.GetLastError()))
+-            return False
++                return False
+ 
+-        bytes_written = c_int(0)
+-        if not KERNEL32.WriteProcessMemory(self.h_process,
++            bytes_written = c_int(0)
++            if not KERNEL32.WriteProcessMemory(self.h_process,
+                                            arg,
+                                            dll + "\x00",
+                                            len(dll) + 1,
+                                            byref(bytes_written)):
+-            log.error("WriteProcessMemory failed when injecting process with "
++                log.error("WriteProcessMemory failed when injecting process with "
+                       "pid %d, injection aborted (Error: %s)",
+                       self.pid, get_error_string(KERNEL32.GetLastError()))
+-            return False
++                return False
+ 
+-        kernel32_handle = KERNEL32.GetModuleHandleA("kernel32.dll")
+-        load_library = KERNEL32.GetProcAddress(kernel32_handle, "LoadLibraryA")
++            kernel32_handle = KERNEL32.GetModuleHandleA("kernel32.dll")
++            load_library = KERNEL32.GetProcAddress(kernel32_handle, "LoadLibraryA")
+ 
+-        config_path = os.path.join(os.getenv("TEMP"), "%s.ini" % self.pid)
+-        with open(config_path, "w") as config:
+-            cfg = Config("analysis.conf")
++            config_path = os.path.join(os.getenv("TEMP"), "%s.ini" % self.pid)
++            with open(config_path, "w") as config:
++                cfg = Config("analysis.conf")
+ 
+-            # The first time we come up with a random startup-time.
+-            if Process.first_process:
++                # The first time we come up with a random startup-time.
++                if Process.first_process:
+                 # This adds 1 up to 30 times of 20 minutes to the startup
+                 # time of the process, therefore bypassing anti-vm checks
+                 # which check whether the VM has only been up for <10 minutes.
+-                Process.startup_time = random.randint(1, 30) * 20 * 60 * 1000
++                    Process.startup_time = random.randint(1, 30) * 20 * 60 * 1000
+ 
+-            config.write("host-ip={0}\n".format(cfg.ip))
+-            config.write("host-port={0}\n".format(cfg.port))
+-            config.write("pipe={0}\n".format(PIPE))
+-            config.write("results={0}\n".format(PATHS["root"]))
+-            config.write("analyzer={0}\n".format(os.getcwd()))
+-            config.write("first-process={0}\n".format(Process.first_process))
+-            config.write("startup-time={0}\n".format(Process.startup_time))
+-
+-            Process.first_process = False
+-
+-        if apc or self.suspended:
+-            log.info("Using QueueUserAPC injection")
+-            if not self.h_thread:
+-                log.info("No valid thread handle specified for injecting "
++                config.write("host-ip={0}\n".format(cfg.ip))
++                config.write("host-port={0}\n".format(cfg.port))
++                config.write("pipe={0}\n".format(PIPE))
++                config.write("results={0}\n".format(PATHS["root"]))
++                config.write("analyzer={0}\n".format(os.getcwd()))
++                config.write("first-process={0}\n".format(Process.first_process))
++                config.write("startup-time={0}\n".format(Process.startup_time))
++
++                Process.first_process = False
++
++            if apc or self.suspended:
++                log.info("Using QueueUserAPC injection")
++                if not self.h_thread:
++                    log.info("No valid thread handle specified for injecting "
+                          "process with pid %d, injection aborted", self.pid)
+-                return False
++                    return False
+ 
+-            if not KERNEL32.QueueUserAPC(load_library, self.h_thread, arg):
+-                log.error("QueueUserAPC failed when injecting process with "
++                if not KERNEL32.QueueUserAPC(load_library, self.h_thread, arg):
++                    log.error("QueueUserAPC failed when injecting process with "
+                           "pid %d (Error: %s)",
+                           self.pid, get_error_string(KERNEL32.GetLastError()))
+-                return False
+-            log.info("Successfully injected process with pid %d" % self.pid)
+-        else:
+-            event_name = "CuckooEvent%d" % self.pid
+-            self.event_handle = KERNEL32.CreateEventA(None,
++                    return False
++                log.info("Successfully injected process with pid %d" % self.pid)
++            else:
++                event_name = "CuckooEvent%d" % self.pid
++                self.event_handle = KERNEL32.CreateEventA(None,
+                                                       False,
+                                                       False,
+                                                       event_name)
+-            if not self.event_handle:
+-                log.warning("Unable to create notify event..")
+-                return False
+-
+-            log.info("Using CreateRemoteThread injection")
+-            new_thread_id = c_ulong(0)
+-            thread_handle = KERNEL32.CreateRemoteThread(self.h_process,
++                if not self.event_handle:
++                    log.warning("Unable to create notify event..")
++                    return False
++
++                log.info("Using CreateRemoteThread injection")
++                new_thread_id = c_ulong(0)
++                thread_handle = KERNEL32.CreateRemoteThread(self.h_process,
+                                                         None,
+                                                         0,
+                                                         load_library,
+                                                         arg,
+                                                         0,
+                                                         byref(new_thread_id))
+-            if not thread_handle:
+-                log.error("CreateRemoteThread failed when injecting process "
++                if not thread_handle:
++                    log.error("CreateRemoteThread failed when injecting process "
+                           "with pid %d (Error: %s)",
+                           self.pid, get_error_string(KERNEL32.GetLastError()))
+-                KERNEL32.CloseHandle(self.event_handle)
+-                self.event_handle = None
+-                return False
+-            else:
+-                KERNEL32.CloseHandle(thread_handle)
+-
+-        return True
++                    KERNEL32.CloseHandle(self.event_handle)
++                    self.event_handle = None
++                    return False
++                else:
++                    KERNEL32.CloseHandle(thread_handle)
++            return True
+ 
+     def wait(self):
+         if self.event_handle:
+diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/windows/modules/packages/exe.py
+--- original/analyzer/windows/modules/packages/exe.py	2014-01-09 15:47:54.000000000 +0100
++++ new/analyzer/windows/modules/packages/exe.py	2014-01-14 18:22:32.929115759 +0100
+@@ -13,6 +13,7 @@ class Exe(Package):
+         free = self.options.get("free", False)
+         args = self.options.get("arguments", None)
+         dll = self.options.get("dll", None)
++        analyse_kernel = self.options.get("analyse_kernel", False)
+         suspended = True
+         if free:
+             suspended = False
+@@ -23,7 +24,10 @@ class Exe(Package):
+                                      "analysis aborted")
+ 
+         if not free and suspended:
+-            p.inject(dll)
++            if analyse_kernel:
++                p.inject(dll,apc=False,analyse_kernel=True)
++            else:
++                p.inject(dll)
+             p.resume()
+             p.close()
+             return p.pid
+diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/windows/modules/packages/generic.py
+--- original/analyzer/windows/modules/packages/generic.py	2014-01-09 15:47:54.000000000 +0100
++++ new/analyzer/windows/modules/packages/generic.py	2014-01-14 18:22:32.929115759 +0100
+@@ -14,6 +14,7 @@ class Genric(Package):
+     def start(self, path):
+         free = self.options.get("free", False)
+         dll = self.options.get("dll", None)
++        analyse_kernel = self.options.get("analyse_kernel", False)
+         suspended = True
+         if free:
+             suspended = False
+@@ -27,7 +28,10 @@ class Genric(Package):
+                                      "analysis aborted")
+ 
+         if not free and suspended:
+-            p.inject(dll)
++            if analyse_kernel:
++                p.inject(dll,apc=False,analyse_kernel=True)
++            else:
++                p.inject(dll)
+             p.resume()
+             p.close()
+             return p.pid
+diff -rupN original/data/html/sections/behavior.html new/data/html/sections/behavior.html
+--- original/data/html/sections/behavior.html	2014-01-09 15:47:49.000000000 +0100
++++ new/data/html/sections/behavior.html	2014-01-14 18:22:33.062449084 +0100
+@@ -77,7 +77,15 @@
+                             {{argument.name}} => <span class="mono">{{argument.value}}</span><br />
+                         {% endfor %}
+                         </td>
+-                        <td>{% if call.status %}SUCCESS{% else %}FAILURE{% endif %}</td>
++                        <td>
++                        {% if call.status == 1 %}
++                            SUCCESS
++                        {% elif call.status == 2 %}
++                             WARNING
++                        {% else %}
++                             FAILURE
++                        {% endif %}
++                        </td>
+                         <td>{{call.return}}</td>
+                         <td>
+                         {% if call.repeated and call.repeated > 0 %}
+diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
+--- original/lib/cuckoo/common/logtbl.py	2014-01-09 15:47:54.000000000 +0100
++++ new/lib/cuckoo/common/logtbl.py	2014-01-14 18:22:33.282449072 +0100
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2013 Cuckoo Sandbox Developers.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -193,4 +193,35 @@ table = [
+     ("ZwMapViewOfSection", "process", ("ppPp", "SectionHandle", "ProcessHandle", "BaseAddress", "SectionOffset")),
+     ("GetSystemMetrics", "misc", ("l", "SystemMetricIndex")),
+     ("GetCursorPos", "misc", ("ll", "x", "y")),
++	("REGISTRY_OPEN_KEY", "registry", ("s", "SubKey")),
++	("REGISTRY_DELETE_KEY", "registry", ("s", "SubKey")),
++	("REGISTRY_VALUE_KEY_SET", "registry", ("ss", "SubKey", "ValueName")),
++	("REGISTRY_VALUE_KEY_DELETE", "registry", ("ss", "SubKey", "ValueName")),
++	("REGISTRY_KEY_RENAME", "registry", ("ss", "SubKey", "NewName")),
++	("REGISTRY_ENUMERATE_KEY", "registry", ("s", "SubKey")),
++	("REGISTRY_ENUMERATE_VALUE_KEY", "registry", ("s", "SubKey")),
++	("REGISTRY_QUERY_KEY", "registry", ("s", "SubKey")),
++	("REGISTRY_QUERY_VALUE_KEY", "registry", ("ss", "SubKey", "ValueName")),
++	("REGISTRY_CREATE_KEY", "registry", ("s", "SubKey")),
++	("LOAD_DRIVER", "system", ("s", "DriverName")),
++	("SHUTDOWN", "system", ("",)),
++	("ZwOpenProcess", "process", ("ss", "ProcessName", "PID")),
++	("ZwOpenThread", "threading", ("s", "TID")),
++	("ZwQuerySystemInformation", "process", ("s", "SystemInformationClass")),
++	("ZwWriteVirtualMemory", "process", ("ss", "PID", "BaseAddress")),
++	("ZwDebugActiveProcess", "process", ("s", "PID")),
++	("ZwCreateProcess", "process", ("s", "PID")),
++	("ZwCreateProcessEx", "process", ("s", "PID")),
++	("ZwQueueApcThread", "threading", ("ss", "TID", "PID")),
++	("ZwCreateThread", "threading", ("sss", "PID", "TID", "CreateSuspended")),
++	("NtMapViewOfSection", "process", ("ss", "PID", "BaseAddress")),
++	("ZwSetContextThread", "threading", ("s", "TID")),
++	("ZwSystemDebugControl", "process", ("",)),
++	("ZwCreateFile", "filesystem", ("sss", "FileHandle", "FileName", "DesiredAccess")),
++	("ZwReadFile", "filesystem", ("ss", "FileHandle",  "FileName")),
++	("ZwWriteFile", "filesystem", ("ss", "FileHandle", "FileName")),
++	("ZwDeleteFile", "filesystem", ("ss", "FileName")),
++	("ZwSetInformationFile (Delete)", "filesystem", ("s", "FileName")),
++	("ZwSetInformationFile (Rename)", "filesystem", ("ss", "OriginalName", "Renamed")),
++	("ZwQueryInformationFile", "filesystem", ("s", "FileInformationClass")),
+ ]
+diff -rupN original/lib/cuckoo/core/database.py new/lib/cuckoo/core/database.py
+--- original/lib/cuckoo/core/database.py	2014-01-09 15:47:54.000000000 +0100
++++ new/lib/cuckoo/core/database.py	2014-01-14 18:22:33.269115740 +0100
+@@ -271,6 +271,7 @@ class Task(Base):
+     target = Column(Text(), nullable=False)
+     category = Column(String(255), nullable=False)
+     timeout = Column(Integer(), server_default="0", nullable=False)
++    analyse = Column(Integer(), server_default="1", nullable=False)
+     priority = Column(Integer(), server_default="1", nullable=False)
+     custom = Column(String(255), nullable=True)
+     machine = Column(String(255), nullable=True)
+@@ -716,6 +717,7 @@ class Database(object):
+             timeout=0,
+             package="",
+             options="",
++            analyse=1,
+             priority=1,
+             custom="",
+             machine="",
+@@ -743,6 +745,8 @@ class Database(object):
+         # Convert empty strings and None values to a valid int
+         if not timeout:
+             timeout = 0
++        if not analyse:
++            analyse = 1
+         if not priority:
+             priority = 1
+ 
+@@ -780,6 +784,7 @@ class Database(object):
+         task.timeout = timeout
+         task.package = package
+         task.options = options
++        task.analyse = analyse
+         task.priority = priority
+         task.custom = custom
+         task.machine = machine
+@@ -821,6 +826,7 @@ class Database(object):
+                  timeout=0,
+                  package="",
+                  options="",
++                 analyse=1,
+                  priority=1,
+                  custom="",
+                  machine="",
+@@ -849,6 +855,8 @@ class Database(object):
+         # Convert empty strings and None values to a valid int
+         if not timeout:
+             timeout = 0
++        if not analyse:
++            analyse = 1
+         if not priority:
+             priority = 1
+ 
+@@ -856,6 +864,7 @@ class Database(object):
+                         timeout,
+                         package,
+                         options,
++                        analyse,
+                         priority,
+                         custom,
+                         machine,
+@@ -870,6 +879,7 @@ class Database(object):
+                 timeout=0,
+                 package="",
+                 options="",
++                analyse=1,
+                 priority=1,
+                 custom="",
+                 machine="",
+@@ -896,6 +906,8 @@ class Database(object):
+         # Convert empty strings and None values to a valid int
+         if not timeout:
+             timeout = 0
++        if not analyse:
++            analyse = 1
+         if not priority:
+             priority = 1
+         
+@@ -903,6 +915,7 @@ class Database(object):
+                         timeout,
+                         package,
+                         options,
++                        analyse,
+                         priority,
+                         custom,
+                         machine,
+@@ -949,6 +962,7 @@ class Database(object):
+                    task.timeout,
+                    task.package,
+                    task.options,
++                   task.analyse,
+                    task.priority,
+                    task.custom,
+                    task.machine,
+diff -rupN original/modules/processing/behavior.py new/modules/processing/behavior.py
+--- original/modules/processing/behavior.py	2014-01-09 15:47:55.000000000 +0100
++++ new/modules/processing/behavior.py	2014-01-14 18:22:33.175782411 +0100
+@@ -173,7 +173,7 @@ class ParseProcessLog(list):
+             thread_id = row[1]    # Thread ID.
+             category = row[2]     # Win32 function category.
+             api_name = row[3]     # Name of the Windows API.
+-            status_value = row[4] # Success or Failure?
++            status_value = row[4] # Success or Failure or Blocked?
+             return_value = row[5] # Value returned by the function.
+         except IndexError as e:
+             log.debug("Unable to parse process log row: %s", e)
+@@ -200,7 +200,7 @@ class ParseProcessLog(list):
+         call["thread_id"] = str(thread_id)
+         call["category"] = category
+         call["api"] = api_name
+-        call["status"] = bool(int(status_value))
++        call["status"] = int(status_value)
+ 
+         if isinstance(return_value, int):
+             call["return"] = "0x%.08x" % return_value
+diff -rupN original/web/submission/views.py new/web/submission/views.py
+--- original/web/submission/views.py	2014-01-09 15:47:49.000000000 +0100
++++ new/web/submission/views.py	2014-01-14 18:22:33.795782376 +0100
+@@ -26,6 +26,7 @@ def index(request):
+         package = request.POST.get("package", "")
+         timeout = force_int(request.POST.get("timeout"))
+         options = request.POST.get("options", "")
++        analyse = force_int(request.POST.get("analyse"))
+         priority = force_int(request.POST.get("priority"))
+         machine = request.POST.get("machine", "")
+         custom = request.POST.get("custom", "")
+@@ -43,6 +44,11 @@ def index(request):
+                 options += "&"
+             options += "procmemdump=yes"
+ 
++        if analyse == 2:
++            if options:
++                options += "&"
++            options += "analyse_kernel=yes"    
++
+         if "sample" in request.FILES:
+             # Preventive checks.
+             if request.FILES["sample"].size == 0:
+@@ -62,6 +68,7 @@ def index(request):
+                                   package=package,
+                                   timeout=timeout,
+                                   options=options,
++                                  analyse=analyse,
+                                   priority=priority,
+                                   machine=machine,
+                                   custom=custom,
+@@ -90,6 +97,7 @@ def index(request):
+                                  package=package,
+                                  timeout=timeout,
+                                  options=options,
++                                 analyse=analyse,
+                                  priority=priority,
+                                  machine=machine,
+                                  custom=custom,
+diff -rupN original/web/templates/submission/index.html new/web/templates/submission/index.html
+--- original/web/templates/submission/index.html	2014-01-09 15:47:49.000000000 +0100
++++ new/web/templates/submission/index.html	2014-01-14 18:22:33.569115722 +0100
+@@ -101,6 +101,15 @@ $(document).ready( function() {
+                                 <label for="form_options">Options</label>
+                                 <input type="text" class="form-control" id="form_options" name="options" />
+                             </div>
++
++                            <div class="form-group">
++                                <label for "form_analyse">Analyse</label>
++                                <select class="form-control" id="form_analyse" name="analyse">
++                                    <option value="1">Userland</option>
++                                    <option value="2">Kernelland</option>
++                                </select>
++                            </div>
++                            
+                             <div class="form-group">
+                                 <label for="form_priority">Priority</label>
+                                 <select class="form-control" id="form_priority" name="priority">
+@@ -149,4 +158,4 @@ $(document).ready( function() {
+         </form>
+     </div>
+ </div>
+-{% endblock %}
+\ No newline at end of file
++{% endblock %}
+\ No newline at end of file
