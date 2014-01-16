@@ -23,15 +23,25 @@ INSTALL/USE
 To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo and prepare the host.
 
 1- First patch cuckoo using the .patch file, in order to support the driver.
+
 	a. copy "cuckoo.patch" to your cuckoo root directory
+	
 	b. run "patch -p1 < ./cuckoo.patch"
+	
 2- Open your virtual machine, it MUST run a "Windows XP x86" OS
+
 3- Install ActivePython 2.7 (http://www.activestate.com/activepython/downloads)
+
 4- Copy "zer0m0n.inf", "start.bat", "logs_dispatcher.exe" and "zer0m0n.sys" (zer0m0n* files must be placed in the same directory)
+
 5- Right click on "zer0m0n.inf" file then "Install"
+
 6- Run "start.bat"
+
 7- Run "logs_dispatcher.exe"
+
 8- Run the "agent.py" script as usual
+
 9- Snapshot the VM
 
 While submitting a new analysis, choose "kernelland" option on the Web interface, or use the option "analyse_kernel=yes" on commandline.
@@ -46,12 +56,14 @@ FAQ
 ===
 
 Q: Which injections techniques are handled by the driver ?
+
 A: Known injection techniques are:
 - Process memory modification techniques (ZwWriteVirtualMemory, ZwMapViewOfSection)
 - Debugging techniques (ZwSetContextThread, ZwDebugActiveProcess)
 - New process/thread creation (ZwCreateProcess, ZwCreateThread)
 
 Q: How do you "hide" cuckoo ?
+
 A: For now, several processes are hidden/blocked, by name filtering:
 - "python.exe" (cuckoo processes)
 - "VBoxService.exe" (virtualbox process)
@@ -60,6 +72,7 @@ A: For now, several processes are hidden/blocked, by name filtering:
 This will change soon (see TODO list) ;]
 
 Q: How do you handle the case where a malware will load a driver (and then be at the same level of your driver) and would possibly subvert the analysis ?
+
 A: Well, we can log when a new driver is loaded during the malware execution through PsSetLoadImageNotifyRoutine(), we will stop the analysis when we detect this behavior (see TODO list, again :])
 
 TODO LIST
