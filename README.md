@@ -57,9 +57,8 @@ A: Known injection techniques are:
 
 Q: How do you "hide" cuckoo ?
 
-A: For now, several processes are hidden/blocked, by name filtering:
+A: For now, several processes are hidden/blocked, by pid filtering:
     - "python.exe" (cuckoo processes)
-    - "VBoxService.exe" (virtualbox process)
     - "logs_dispatcher.exe" (userland app)
 
 This will change soon (see TODO list) ;]
