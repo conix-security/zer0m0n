@@ -34,7 +34,7 @@ To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo 
 8- Run the "agent.py" script as usual
 9- Snapshot the VM
 
-While submitting a new analysis, choose "kernelland" option on the Web interface. Only the web interface allows choosing this option for now.
+While submitting a new analysis, choose "kernelland" option on the Web interface, or use the option "analyse_kernel=yes" on commandline.
 
 COMPILATION
 ===========
