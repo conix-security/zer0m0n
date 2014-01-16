@@ -60,7 +60,7 @@ Q: How do you "hide" cuckoo ?
 
 A: For now, several processes are hidden/blocked, by pid filtering:
 
-    - "python.exe" (cuckoo processes)
+    - "python.exe" (analyzer.py)
     - "logs_dispatcher.exe" (userland app)
 
 This will change soon (see TODO list) ;]
@@ -77,21 +77,20 @@ Here is a list of such improvements to come :
 
 - anti detection features :
     + anti-vm detection* (cuckoo & virtual machine related files/processes/registry/connections)
-    + process hiding using PID (actually performed using process names)
     + hide threads (actually only processes are hidden)
+    + also hide the analyzer.py PPID (agent.py)
+    + randomize driver and application names
 - handle machine poweroff
-- randomize driver and application names
 - detect process crashes (exploits ?)
 - monitor more events / functions
 - fix file deletion race condition
 - find and fix generic bugs ;]
 - log registries callbacks return when possible
-- cut the analysis when a new driver is loaded during malware execution
+- stop analysis when a new driver is loaded
 - signatures support for kernel analysis
 - x64 version !!! clean : without SSDT hooks (:
 
-*: there are plenty of ways to detect cuckoo or a virtual machine, our thought is to handle known (and used) techniques, and to build
-   post-analysis signatures to detect generic detection techniques and warn the user about possible detection/bypass.
+*: there are plenty of ways to detect cuckoo or a virtual machine, our thought is to handle known (and used) techniques, and to build post-analysis signatures to detect generic detection techniques and warn the user about possible detection/bypass.
 
 This list is not exhaustive, if you discover any bug or you would like some specific features, just let us know (: 
 
