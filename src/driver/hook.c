@@ -238,8 +238,8 @@ NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 	PWCHAR parameter = NULL;
 	USHORT log_lvl = LOG_ERROR;
 
-	currentProc = (ULONG)PsGetCurrentProcessId();
-		
+	currentProc = (ULONG)PsGetCurrentProcessId();	
+	
 	if(isProcessMonitoredByPid(currentProc))
 	{   		
 		remoteProc.Length = 0;
@@ -248,7 +248,30 @@ NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 		
 		if(remoteProc.Buffer)
 		{
-			remotePid = (ULONG)ClientID->UniqueProcess;
+			if(ClientID != NULL)
+			{
+				try 
+				{
+					if(ExGetPreviousMode() != KernelMode)
+						ProbeForRead(ClientID, sizeof(ClientID), 1);
+					remotePid = (ULONG)ClientID->UniqueProcess;
+				} except (EXCEPTION_EXECUTE_HANDLER)
+				{
+					ExFreePool(remoteProc.Buffer);
+					return STATUS_INVALID_PARAMETER;
+				}
+			}
+			else
+			{
+				ExFreePool(remoteProc.Buffer);
+				statusCall = ((ZWOPENPROCESS)(oldZwOpenProcess))(ProcessHandle, DesiredAccess, ObjectAttributes, ClientID);
+				if(NT_SUCCESS(statusCall))
+					sendLogs(currentProc, L"ZwOpenProcess", L"1,0,ss,ProcessName->Error,PID->-1");
+				else
+					sendLogs(currentProc, L"ZwOpenProcess", L"0,0,ss,ProcessName->Error,PID->-1");
+				return ((ZWOPENPROCESS)(oldZwOpenProcess))(ProcessHandle, DesiredAccess, ObjectAttributes, ClientID);
+			}			
+			
 			status = getProcNameByPID(remotePid, &remoteProc);
 			if(NT_SUCCESS(status))
 			{
@@ -302,7 +325,6 @@ NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 				return statusCall;
 					
 			}
-			
 			ExFreePool(remoteProc.Buffer);
 		}
 		// At this point, we could not retrieve the process name from its PID thus not assess if the process must be hidden.

