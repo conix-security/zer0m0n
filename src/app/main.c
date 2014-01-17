@@ -54,6 +54,8 @@ int main(int argc, char **argv)
 	LOG log;
 	int size, i, ptr_msg;
 	int is_init = 0;
+	int error = 0;
+	int error_len = sizeof(error);
 	PUNICODE_STRING us_pathfile = NULL;
 	PWCHAR pw_pathfile = NULL;
 
@@ -134,7 +136,18 @@ int main(int argc, char **argv)
 
 				// retrieve socket associated to the pid
 				log.g_sock = getSockIdFromPid(log.pid);
-				connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr));
+
+				// check if the socket is still connected
+				getsockopt(log.g_sock, SOL_SOCKET, SO_ERROR, (char*)&error, &error_len);
+				if(error == WSAECONNABORTED || error == WSAECONNRESET || error == WSAENOTCONN)
+				{
+					printf("reconnecting socket...\n");
+					closesocket(log.g_sock);
+					log.g_sock = log_init(g_config.host_ip, g_config.host_port, 0);
+					if(connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr)) == 0)
+						printf("socket connected\n");
+					announce_netlog(log.pid, log.g_sock);
+				}
 			}
 
 			// retrieve function name
@@ -187,6 +200,7 @@ int main(int argc, char **argv)
 				case 3:
 					retrieve_parameters(log.nb_arguments, msg.message, ptr_msg, size, log.arguments);
 					i = log_resolve_index(log.funcname, 0);
+					connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr));
 					loq(log.g_sock, i, log.funcname, log.success, log.ret, log.fmt, log.arguments[0].arg, log.arguments[0].value, log.arguments[1].arg, log.arguments[1].value, log.arguments[2].arg, log.arguments[2].value);
 				default:
 					break;
