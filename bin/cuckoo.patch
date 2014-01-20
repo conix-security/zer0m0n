@@ -739,7 +739,7 @@ diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
 +	("ZwDeleteFile", "filesystem", ("ss", "FileName")),
 +	("ZwSetInformationFile (Delete)", "filesystem", ("s", "FileName")),
 +	("ZwSetInformationFile (Rename)", "filesystem", ("ss", "OriginalName", "Renamed")),
-+	("ZwQueryInformationFile", "filesystem", ("s", "FileInformationClass")),
++	("ZwQueryInformationFile", "filesystem", ("ss", "FileHandle", "FileInformationClass")),
  ]
 diff -rupN original/lib/cuckoo/core/database.py new/lib/cuckoo/core/database.py
 --- original/lib/cuckoo/core/database.py	2014-01-09 15:47:54.000000000 +0100
