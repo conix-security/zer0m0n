@@ -44,8 +44,13 @@
 //
 //	Parameters : 
 //	Return value :
-//	Process : 
-//		Connects to filter communication port, retrieves logs from the driver, parse them and send to cuckoo
+//	Process :
+//		Gets the main cuckoo parameters.
+//		Connects to filter communication port then loops while receiving data from the zer0m0n driver.
+//		When a new process is detected, analyzer.py is notified and the new PID is added to the
+//		monitored processes list along with a new socket, which will be used for this PID.
+//		Logs are parsed, then directly sent to the Cuckoo host.
+//		Sockets states are regularly checked to avoid connection issues.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
@@ -58,14 +63,21 @@ int main(int argc, char **argv)
 	int error_len = sizeof(error);
 	PUNICODE_STRING us_pathfile = NULL;
 	PWCHAR pw_pathfile = NULL;
-
+	
 	log.funcname = NULL;
 	log.procname = NULL;
 	log.fmt = NULL;
 	log.arguments = NULL;
-
-	RtlInitUnicodeString = (RTLINITUNICODESTRING)GetProcAddress(LoadLibrary("ntdll.dll"), "RtlInitUnicodeString"); 
-
+	
+	RtlInitUnicodeString = (RTLINITUNICODESTRING)GetProcAddress(LoadLibrary("ntdll.dll"), "RtlInitUnicodeString");
+	if(RtlInitUnicodeString == NULL)
+		return -1;
+	
+	// initialization
+	read_config(log.pid);
+	g_pipe_name = g_config.pipe_name;
+	file_init();
+	
 	FilterConnectCommunicationPort(L"\\FilterPort", 0, NULL, 0, NULL, &hPort);
 	if(hPort == INVALID_HANDLE_VALUE)
 	{
@@ -74,51 +86,42 @@ int main(int argc, char **argv)
 	}
 	printf("[+] connected to filter communication port\n");
 	
-	// loop : retrieves each logs sent by the driver 
-	// "pid","processus_name","function_name","FAILED/SUCCESS//BLOCKED(0/1/2)","return_value","parameters format (ex : sss)","argument1->value1","argument2->value2"...
 	while(1)
 	{
 		if(FilterGetMessage(hPort,(PFILTER_MESSAGE_HEADER)&msg, sizeof(KERNEL_MESSAGE), NULL) == S_OK)
 		{
-			// string well formated
+			// 0x0A : message delimiter
 			i=0;
-			while(msg.message[i] != 0x0A)				
+			while(msg.message[i] != 0x0A)
 				i++;
-			msg.message[i] = 0x0;		
-
+			msg.message[i] = 0x0;
+			
 			// initialize pointer to the beginning of the log
 			ptr_msg = 0;
-
-			// retrieve pid
-			size = getsize(0, msg.message, 0x2C);	
+			
+			// get PID
+			size = getsize(0, msg.message, 0x2C);
 			log.pid = retrieve_int(msg.message, size);
 			ptr_msg = size+1;
-
-			// if new pid, add it to linked list
+			
 			if(!isProcessMonitoredByPid(log.pid))
 			{
-				printf("new pid : %d\n", log.pid); 
-
-				// retrieve pipe name
-				if(!is_init)
-				{
-					read_config(log.pid);
-					g_pipe_name = g_config.pipe_name;
-					file_init();
-					is_init = 1;
-				}
-
-				// notifies cuckoo that a new process is being monitored
+				printf("[+] NEW PID: %d\n", log.pid); 
+				
+				// notifies analyzer.py
 				pipe("KPROCESS:%d", log.pid);
 				
-				// retrieves host address/port
+				// create socket / new struct
 				log.g_sock = log_init(g_config.host_ip, g_config.host_port, 0);
-
-				startMonitoringProcess(log.pid, log.g_sock);
-				connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr));
+				if(startMonitoringProcess(log.pid, log.g_sock) == -1)
+					printf("[!] Could not add %d\n",log.pid);
+				
+				if(connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr)))
+					printf("[!] Could not connect %d\n",WSAGetLastError());
+				
 				announce_netlog(log.pid, log.g_sock);
-
-				// retrieve process name
+				
+				// get process name
 				size = getsize(ptr_msg, msg.message, 0x2C);
 				log.procname = malloc(size+1);
 				log.procname[size] = 0x0;
@@ -133,29 +136,33 @@ int main(int argc, char **argv)
 				// skip process name
 				size = getsize(ptr_msg, msg.message, 0x2C);
 				ptr_msg += size+1;
-
-				// retrieve socket associated to the pid
-				log.g_sock = getSockIdFromPid(log.pid);
-
-				// check if the socket is still connected
+				
+				// get socket
+				log.g_sock = getMonitoredProcessSocket(log.pid);
+				
+				// connection status ?
 				getsockopt(log.g_sock, SOL_SOCKET, SO_ERROR, (char*)&error, &error_len);
-				if(error == WSAECONNABORTED || error == WSAECONNRESET || error == WSAENOTCONN)
+				if(error == WSAECONNABORTED || error == WSAECONNRESET || error == WSAENOTCONN || error == WSAENETRESET || error == WSAETIMEDOUT)
 				{
-					printf("reconnecting socket...\n");
+					// software error
+					printf("[!] Reconnecting socket...");
 					closesocket(log.g_sock);
 					log.g_sock = log_init(g_config.host_ip, g_config.host_port, 0);
 					if(connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr)) == 0)
-						printf("socket connected\n");
+						printf(" OK\n");
+					else
+						printf(" ERROR %d\n",WSAGetLastError());
 					announce_netlog(log.pid, log.g_sock);
+					setMonitoredProcessSocket(log.pid, log.g_sock);
 				}
 			}
-
+			
 			// retrieve function name
 			size = getsize(ptr_msg, msg.message, 0x2C);
 			log.funcname = malloc(size+1);
 			log.funcname[size] = 0x0;
 			memcpy(log.funcname, msg.message+ptr_msg, size);
-		
+			
 			// retrieve success status
 			ptr_msg += size+1;
 			log.success = retrieve_int(msg.message+ptr_msg, 1);
@@ -164,14 +171,14 @@ int main(int argc, char **argv)
 			ptr_msg += 2;
 			size = getsize(ptr_msg, msg.message, 0x2C);
 			log.ret = retrieve_int(msg.message+ptr_msg, size);
-
+			
 			// retrieve format parameters 
 			ptr_msg += size+1;
 			size = getsize(ptr_msg, msg.message, 0x2C);
 			log.fmt = malloc(size+1);
 			log.fmt[size] = 0x0;
 			memcpy(log.fmt, msg.message+ptr_msg, size);
-
+			
 			// retrieve arguments
 			log.nb_arguments = strlen(log.fmt);
 			if(log.nb_arguments)
@@ -190,23 +197,22 @@ int main(int argc, char **argv)
 					i = log_resolve_index(log.funcname, 0);
 					loq(log.g_sock, i, log.funcname, log.success, log.ret, log.fmt, log.arguments[0].arg, log.arguments[0].value);
 				break;
-
+				
 				case 2:
 					retrieve_parameters(log.nb_arguments, msg.message, ptr_msg, size, log.arguments);
 					i = log_resolve_index(log.funcname, 0);
 					loq(log.g_sock, i, log.funcname, log.success, log.ret, log.fmt, log.arguments[0].arg, log.arguments[0].value, log.arguments[1].arg, log.arguments[1].value);
 				break;
-
+				
 				case 3:
 					retrieve_parameters(log.nb_arguments, msg.message, ptr_msg, size, log.arguments);
 					i = log_resolve_index(log.funcname, 0);
-					connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr));
 					loq(log.g_sock, i, log.funcname, log.success, log.ret, log.fmt, log.arguments[0].arg, log.arguments[0].value, log.arguments[1].arg, log.arguments[1].value, log.arguments[2].arg, log.arguments[2].value);
 				default:
 					break;
 			}			
 			
-			// if the log contains "ZwWriteFile" as function name, notifies cuckoo that a file has to be dump
+			// if the log contains "ZwWriteFile" as function name, notifies cuckoo that a file has to be dumpped
 			if(!strcmp(log.funcname, "ZwWriteFile") && !log.ret)
 			{ 
 				us_pathfile = (PUNICODE_STRING)malloc(1024*sizeof(UNICODE_STRING));
@@ -217,7 +223,7 @@ int main(int argc, char **argv)
 				free(us_pathfile);
 				free(pw_pathfile);
 			}
-
+			
 			// TODO
 			if(!strcmp(log.funcname, "ZwDeleteFile") && !log.ret)
 			{

@@ -485,6 +485,7 @@ int log_init(unsigned int ip, unsigned short port, int debug)
         WSAStartup(MAKEWORD(2, 2), &wsa);
 
         g_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	printf("\t[-] New socket created.\n");
 
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(port);

@@ -79,17 +79,16 @@ BOOLEAN isProcessMonitoredByPid(ULONG pid)
 	PMONITORED_PROCESS_ENTRY ptr;
 	
 	if(pid == 0)
-		return 0;
+		return -1;
 		
 	ptr = monitored_process_list;
 	while(ptr != NULL)
 	{
 		if(ptr->pid == pid)
-			return 1;
-		
+			return 0;	
 		ptr = (PMONITORED_PROCESS_ENTRY)(ptr->flink);
 	}
-	return 0;
+	return -1;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,7 +101,7 @@ BOOLEAN isProcessMonitoredByPid(ULONG pid)
 //	Process :
 //		Walks through the linked list, returns the socket id if "pid" is found.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int getSockIdFromPid(ULONG pid)
+int getMonitoredProcessSocket(ULONG pid)
 {
 	PMONITORED_PROCESS_ENTRY ptr;
 
@@ -117,5 +116,36 @@ int getSockIdFromPid(ULONG pid)
 		
 		ptr = (PMONITORED_PROCESS_ENTRY)(ptr->flink);
 	}
-	return 1;
+	return -1;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Updates a PID-related socket
+//	Parameters :
+//		_in_ ULONG pid : Process Identifier.
+//		_in_ int new_sock : Socket
+//	Return value :
+//		int : 0 if success, -1 if not.
+//	Process :
+//		Walks through the linked list, updates the socket if "pid" is found.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+int setMonitoredProcessSocket(ULONG pid, int new_sock)
+{
+	PMONITORED_PROCESS_ENTRY ptr;
+
+	if(pid == 0)
+		return -1;
+
+	ptr = monitored_process_list;
+	while(ptr != NULL)
+	{
+		if(ptr->pid == pid)
+		{
+			ptr->g_sock = new_sock;
+			return 0;
+		}
+		ptr = (PMONITORED_PROCESS_ENTRY)(ptr->flink);
+	}
+	return -1;
 }
