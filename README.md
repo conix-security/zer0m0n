@@ -3,7 +3,7 @@ zer0m0n v0.1
 
 zer0m0n is a driver for Cuckoo Sandbox, it will perform kernel analysis during the execution of a malware. There are many ways for a malware author to bypass Cuckoo detection, he can detect the hooks, hardcodes the Nt* functions to avoid the hooks, detect the virtual machine... The goal of this driver is to offer the possibility for the user to choose between the classical userland analysis or a kernel analysis, which will be harder to detect or bypass.
 
-Actually, it only works for XP 32 bit Windows machines, because of SSDT hooks usage (yes, we know it's not the "clean" technique :]), but we plan supporting other OSes.
+Actually, it only works for XP 32 bit Windows machines, because of SSDT hooks usage ( :] ), but we plan supporting other OSes.
 
 How it works
 ============
@@ -63,7 +63,7 @@ A: For now, several processes are hidden/blocked, by pid filtering:
     - "python.exe" (cuckoo processes)
     - "logs_dispatcher.exe" (userland app)
 
-This will change soon (see TODO list) ;]
+The zer0m0n driver is not hidden, the service cannot be unloaded using ZwUnloadDriver.
 
 Q: How do you handle the case where a malware will load a driver (and then be at the same level of your driver) and would possibly subvert the analysis ?
 
@@ -77,23 +77,38 @@ Here is a list of such improvements to come :
 
 - anti detection features :
     + anti-vm detection* (cuckoo & virtual machine related files/processes/registry/connections)
-    + process hiding using PID (actually performed using process names)
-    + hide threads (actually only processes are hidden)
+    + hide threads (listing)
+    + Block SCM functions (driver protection)
 - handle machine poweroff
+- monitor SCM functions (services)
 - randomize driver and application names
 - detect process crashes (exploits ?)
 - monitor more events / functions
 - fix file deletion race condition
 - find and fix generic bugs ;]
 - log registries callbacks return when possible
-- cut the analysis when a new driver is loaded during malware execution
+- stop the analysis when a new driver is loaded during malware execution
 - signatures support for kernel analysis
 - x64 version !!! clean : without SSDT hooks (:
+- etc.
 
 *: there are plenty of ways to detect cuckoo or a virtual machine, our thought is to handle known (and used) techniques, and to build
    post-analysis signatures to detect generic detection techniques and warn the user about possible detection/bypass.
 
 This list is not exhaustive, if you discover any bug or you would like some specific features, just let us know (: 
+
+DISCLAIMER
+==========
+
+As you must have seen (especially if you looked at the code), we're not really "production" driver developpers :]. Thus, if you find:
+- bugs
+- bypassing techniques (or just easy-to-use detecting techniques)
+- vulnerabilities (there must be some)
+- new functions to monitor (or parameters)
+- generic remarks about driver development
+- beer
+
+Please just let us know !!! :]
 
 Authors
 =======
