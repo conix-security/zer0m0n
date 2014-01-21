@@ -1175,8 +1175,10 @@ NTSTATUS newZwCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 	HANDLE kRootDirectory, kFileHandle;
 	UNICODE_STRING full_path, kObjectName;
 	POBJECT_NAME_INFORMATION nameInfo = NULL;
-	BOOLEAN to_release = FALSE;
 	USHORT log_lvl = LOG_ERROR;
+	full_path.Buffer = NULL;
+	kObjectName.Buffer = NULL;
+	
 	
 	currentProc = (ULONG)PsGetCurrentProcessId();
 	status = ((ZWCREATEFILE)(oldZwCreateFile))(FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, AllocationSize, FileAttributes, ShareAccess, CreateDisposition, CreateOptions, EaBuffer, EaLength);
@@ -1226,13 +1228,12 @@ NTSTATUS newZwCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 			{
 				if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, nameInfo, MAXSIZE, NULL)))
 				{
-					full_path.MaximumLength = nameInfo->Name.Length + kObjectName.Length + to_add.Length + sizeof(WCHAR);
+					full_path.MaximumLength = nameInfo->Name.Length + kObjectName.Length + 2 + sizeof(WCHAR);
 					full_path.Buffer = ExAllocatePoolWithTag(NonPagedPool, full_path.MaximumLength, BUFFER_TAG);
 					RtlZeroMemory(full_path.Buffer, full_path.MaximumLength);
 					RtlCopyUnicodeString(&full_path, &(nameInfo->Name));
 					RtlAppendUnicodeToString(&full_path, L"\\");
 					RtlAppendUnicodeStringToString(&full_path, &kObjectName);
-					to_release = TRUE;
 				}
 			}
 		}
@@ -1264,13 +1265,13 @@ NTSTATUS newZwCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 				sendLogs(currentProc, L"ZwCreateFile", L"1,0,sss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR");
 			break;
 		}
-		if(kObjectName.Buffer)
+		if(kObjectName.Buffer && kObjectName.Buffer != full_path.Buffer)
 			ExFreePool(kObjectName.Buffer);
 		if(parameter != NULL)
 			ExFreePool(parameter);
 		if(nameInfo != NULL)
 			ExFreePool(nameInfo);
-		if(to_release)
+		if(full_path.Buffer)
 			ExFreePool(full_path.Buffer);
 	}
 	return status;
@@ -1532,7 +1533,7 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 	PWCHAR parameter = NULL;
 	PWCHAR kFileName = NULL;
 	USHORT log_lvl = LOG_ERROR;
-	
+	full_path.Buffer = NULL;
 	currentProc = (ULONG)PsGetCurrentProcessId();
 	status = ((ZWSETINFORMATIONFILE)(oldZwSetInformationFile))(FileHandle, IoStatusBlock, FileInformation, Length, FileInformationClass);
 	
@@ -1590,19 +1591,19 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 			
 			if(kDeleteFile == TRUE)
 			{
-				nameInfo = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-				if(nameInfo && parameter)
-					ZwQueryObject(kFileHandle, ObjectNameInformation, nameInfo, MAXSIZE, NULL);
+				originalName = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+				if(originalName && parameter)
+					ZwQueryObject(kFileHandle, ObjectNameInformation, originalName, MAXSIZE, NULL);
 				if(NT_SUCCESS(status))
 				{
 					log_lvl = LOG_SUCCESS;
-					if(parameter && nameInfo && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,%d,s,FileName->%wZ", status, &(nameInfo->Name))))
+					if(parameter && originalName && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,%d,s,FileName->%wZ", status, &(originalName->Name))))
 						log_lvl = LOG_PARAM;
 				}
 				else
 				{
 					log_lvl = LOG_ERROR;
-					if(parameter && nameInfo && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,FileName->%wZ", status, &(nameInfo->Name))))
+					if(parameter && originalName && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,FileName->%wZ", status, &(originalName->Name))))
 						log_lvl = LOG_PARAM;
 				}
 				switch(log_lvl)
@@ -1617,8 +1618,8 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 						sendLogs(currentProc, L"ZwSetInformationFile (Delete)", L"0,0,s,Error");
 					break;
 				}
-				if(nameInfo != NULL)
-					ExFreePool(nameInfo);
+				if(originalName != NULL)
+					ExFreePool(originalName);
 			}
 		}
 		
@@ -1630,7 +1631,7 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 				if(ExGetPreviousMode() != KernelMode)
 				{
 					ProbeForRead(FileInformation, sizeof(FILE_RENAME_INFORMATION), 1);
-					ProbeForRead(FileInformation->FileName, FileInformation->FileNameLength, 1);
+					ProbeForRead(((PFILE_RENAME_INFORMATION)FileInformation)->FileName, ((PFILE_RENAME_INFORMATION)FileInformation)->FileNameLength, 1);
 				}
 				kFileRenameInformation = (PFILE_RENAME_INFORMATION)FileInformation;
 				kRootDirectory = kFileRenameInformation->RootDirectory;
@@ -1645,7 +1646,7 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 					return status;
 				}
 				RtlZeroMemory(kFileName, kFileNameLength + sizeof(WCHAR));
-				RtlCopyMemory(kFileName, kFileRenameInformation->kFileName, kFileNameLength);
+				RtlCopyMemory(kFileName, kFileRenameInformation->FileName, kFileNameLength);
 			}
 			__except(EXCEPTION_EXECUTE_HANDLER)
 			{
@@ -1664,18 +1665,17 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 			if(kRootDirectory)	// handle the not null RootDirectory case
 			{
 				// allocate both name information struct and unicode string buffer
-				nameInfo = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-				if(nameInfo)
+				originalName = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+				if(originalName)
 				{
-					if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, nameInfo, MAXSIZE, NULL)))
+					if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, originalName, MAXSIZE, NULL)) && kFileNameLength < 0xFFF0)
 					{
-						full_path.MaximumLength = nameInfo->Name.Length + kFileNameLength + to_add.Length + sizeof(WCHAR);
+						full_path.MaximumLength = originalName->Name.Length + (USHORT)kFileNameLength + 2 + sizeof(WCHAR);
 						full_path.Buffer = ExAllocatePoolWithTag(NonPagedPool, full_path.MaximumLength, BUFFER_TAG);
 						RtlZeroMemory(full_path.Buffer, full_path.MaximumLength);
-						RtlCopyUnicodeString(&full_path, &(nameInfo->Name));
+						RtlCopyUnicodeString(&full_path, &(originalName->Name));
 						RtlAppendUnicodeToString(&full_path, L"\\");
 						RtlAppendUnicodeToString(&full_path, kFileName);
-						to_release = TRUE;
 					}
 				}
 				else
@@ -1703,8 +1703,8 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 						log_lvl = LOG_PARAM;
 			}
 			
-			if(full_path)
-				ExFreePool(full_path);
+			if(full_path.Buffer && full_path.Buffer != kFileName)
+				ExFreePool(full_path.Buffer);
 			if(kFileName)
 				ExFreePool(kFileName);
 			if(originalName)

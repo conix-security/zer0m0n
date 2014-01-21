@@ -111,8 +111,9 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
 +                hFile = win32file.CreateFile(PATH_KERNEL_DRIVER, win32file.GENERIC_READ|win32file.GENERIC_WRITE,
 +                                         0, None, win32file.OPEN_EXISTING, 0, None)
 +                if hFile:
-+                    # to do : get and send ppid
-+                    msg = str(self.pid)+"_"+str(os.getpid())+"_"+str(pi.dwProcessId)+'\0'
++                    p = Process(pid=os.getpid())
++                    ppid = p.get_parent_pid()
++                    msg = str(self.pid)+"_"+str(os.getpid())+"_"+str(ppid)+"_"+str(pi.dwProcessId)+'\0'
 +                    win32file.DeviceIoControl(hFile, IOCTL_PID, msg, None)
 +                else:
 +                    log.warning("Failed to access kernel driver")
