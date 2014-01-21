@@ -95,7 +95,6 @@ Here is a list of such improvements to come :
 *: there are plenty of ways to detect cuckoo or a virtual machine, our thought is to handle known (and used) techniques, and to build
    post-analysis signatures to detect generic detection techniques and warn the user about possible detection/bypass.
 
-This list is not exhaustive, if you discover any bug or you would like some specific features, just let us know (: 
 
 DISCLAIMER
 ==========
