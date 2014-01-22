@@ -48,7 +48,7 @@ int startMonitoringProcess(ULONG new_pid, int new_sock)
 	PMONITORED_PROCESS_ENTRY new_entry;
 	if(new_pid == 0)
 		return -1;
-	if(isProcessMonitoredByPid(new_pid))
+	if(isProcessMonitoredByPid(new_pid) == 0)
 		return 1;
 
 	new_entry = (PMONITORED_PROCESS_ENTRY)malloc(sizeof(MONITORED_PROCESS_ENTRY));
@@ -74,7 +74,7 @@ int startMonitoringProcess(ULONG new_pid, int new_sock)
 //	Process :
 //		Walks through the linked list, returns TRUE if "pid" is found.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-BOOLEAN isProcessMonitoredByPid(ULONG pid)
+int isProcessMonitoredByPid(ULONG pid)
 {
 	PMONITORED_PROCESS_ENTRY ptr;
 	

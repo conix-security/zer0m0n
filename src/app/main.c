@@ -74,8 +74,6 @@ int main(int argc, char **argv)
 		return -1;
 	
 	// initialization
-	read_config(log.pid);
-	g_pipe_name = g_config.pipe_name;
 	file_init();
 	
 	FilterConnectCommunicationPort(L"\\FilterPort", 0, NULL, 0, NULL, &hPort);
@@ -95,7 +93,7 @@ int main(int argc, char **argv)
 			while(msg.message[i] != 0x0A)
 				i++;
 			msg.message[i] = 0x0;
-			
+		
 			// initialize pointer to the beginning of the log
 			ptr_msg = 0;
 			
@@ -103,11 +101,17 @@ int main(int argc, char **argv)
 			size = getsize(0, msg.message, 0x2C);
 			log.pid = retrieve_int(msg.message, size);
 			ptr_msg = size+1;
-			
-			if(!isProcessMonitoredByPid(log.pid))
+
+			if(isProcessMonitoredByPid(log.pid) == -1)
 			{
 				printf("[+] NEW PID: %d\n", log.pid); 
-				
+				if(!is_init)
+				{
+					read_config(log.pid);
+					g_pipe_name = g_config.pipe_name;
+					is_init = 1;
+				}
+
 				// notifies analyzer.py
 				pipe("KPROCESS:%d", log.pid);
 				
@@ -115,10 +119,10 @@ int main(int argc, char **argv)
 				log.g_sock = log_init(g_config.host_ip, g_config.host_port, 0);
 				if(startMonitoringProcess(log.pid, log.g_sock) == -1)
 					printf("[!] Could not add %d\n",log.pid);
-				
+
 				if(connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr)))
 					printf("[!] Could not connect %d\n",WSAGetLastError());
-				
+			
 				announce_netlog(log.pid, log.g_sock);
 				
 				// get process name
@@ -189,25 +193,46 @@ int main(int argc, char **argv)
 			{
 				case 0:
 					i = log_resolve_index(log.funcname, 0);
-					loq(log.g_sock, i, log.funcname, log.success, log.ret, "");
+					loq(log.g_sock,i,log.funcname,log.success,log.ret,"");
 				break;
 				
 				case 1:
 					retrieve_parameters(log.nb_arguments, msg.message, ptr_msg, size, log.arguments);
 					i = log_resolve_index(log.funcname, 0);
-					loq(log.g_sock, i, log.funcname, log.success, log.ret, log.fmt, log.arguments[0].arg, log.arguments[0].value);
+					loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value);
 				break;
 				
 				case 2:
 					retrieve_parameters(log.nb_arguments, msg.message, ptr_msg, size, log.arguments);
 					i = log_resolve_index(log.funcname, 0);
-					loq(log.g_sock, i, log.funcname, log.success, log.ret, log.fmt, log.arguments[0].arg, log.arguments[0].value, log.arguments[1].arg, log.arguments[1].value);
+					loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value);
 				break;
 				
 				case 3:
 					retrieve_parameters(log.nb_arguments, msg.message, ptr_msg, size, log.arguments);
 					i = log_resolve_index(log.funcname, 0);
-					loq(log.g_sock, i, log.funcname, log.success, log.ret, log.fmt, log.arguments[0].arg, log.arguments[0].value, log.arguments[1].arg, log.arguments[1].value, log.arguments[2].arg, log.arguments[2].value);
+					loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value);
+				
+				case 4:
+					retrieve_parameters(log.nb_arguments, msg.message, ptr_msg, size, log.arguments);
+					i = log_resolve_index(log.funcname, 0);
+					loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value);
+				
+				case 5:
+					retrieve_parameters(log.nb_arguments, msg.message, ptr_msg, size, log.arguments);
+					i = log_resolve_index(log.funcname, 0);
+					loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value);
+				
+				case 6:
+					retrieve_parameters(log.nb_arguments, msg.message, ptr_msg, size, log.arguments);
+					i = log_resolve_index(log.funcname, 0);
+					loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value,log.arguments[5].arg,log.arguments[5].value);
+				
+				case 7:
+					retrieve_parameters(log.nb_arguments, msg.message, ptr_msg, size, log.arguments);
+					i = log_resolve_index(log.funcname, 0);
+					loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value,log.arguments[5].arg,log.arguments[5].value,log.arguments[6].arg,log.arguments[6].value);
+			
 				default:
 					break;
 			}			

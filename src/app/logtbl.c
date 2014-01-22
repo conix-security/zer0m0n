@@ -196,7 +196,6 @@ const char *logtbl[] = {
     "REGISTRY_QUERY_VALUE_KEY",
     "REGISTRY_CREATE_KEY",
     "LOAD_DRIVER",
-    "SHUTDOWN",
     "ZwOpenProcess",
     "ZwOpenThread",
     "ZwQuerySystemInformation",
