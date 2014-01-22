@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 	KERNEL_MESSAGE msg;
 	LOG log;
 	int size, i, ptr_msg;
-	int is_init = 0;
+	int init = 0;
 	int error = 0;
 	int error_len = sizeof(error);
 	PUNICODE_STRING us_pathfile = NULL;
@@ -105,11 +105,11 @@ int main(int argc, char **argv)
 			if(isProcessMonitoredByPid(log.pid) == -1)
 			{
 				printf("[+] NEW PID: %d\n", log.pid); 
-				if(!is_init)
+				if(!init)
 				{
 					read_config(log.pid);
 					g_pipe_name = g_config.pipe_name;
-					is_init = 1;
+					init = 1;
 				}
 
 				// notifies analyzer.py
