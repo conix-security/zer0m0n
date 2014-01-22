@@ -196,7 +196,7 @@ typedef NTSTATUS(*ZWWRITEFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATU
 typedef NTSTATUS(*ZWDELETEFILE)(POBJECT_ATTRIBUTES);
 typedef NTSTATUS(*ZWSETINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
 typedef NTSTATUS(*ZWQUERYINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
-
+typedef NTSTATUS(*ZWUNLOADDRIVER)(PUNICODE_STRING DriverServiceName);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
@@ -221,6 +221,7 @@ ZWWRITEFILE oldZwWriteFile;
 ZWDELETEFILE oldZwDeleteFile;
 ZWSETINFORMATIONFILE oldZwSetInformationFile;
 ZWQUERYINFORMATIONFILE oldZwQueryInformationFile;
+ZWUNLOADDRIVER oldZwUnloadDriver;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;

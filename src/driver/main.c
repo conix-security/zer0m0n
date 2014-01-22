@@ -1,4 +1,4 @@
-﻿///////////////////////////////////////////////////////////////////////////
+﻿////////////////////////////////////////////////////////////////////////////
 //
 //	zer0m0n DRIVER
 //
@@ -27,8 +27,8 @@
 //	Email :		adrien.chevalier@conix.fr nicolas.correia@conix.fr
 //	Date :		2013-12-26	  
 //	Notes : 	
-// 		
-////////////////////////////////////////////////////////////////////////////
+//		
+/////////////////////////////////////////////////////////////////////////////
 #include "main.h"
 #include "comm.h"
 #include "monitor.h"
@@ -42,7 +42,7 @@ FLT_REGISTRATION registration =
 {
 	sizeof(FLT_REGISTRATION),
 	FLT_REGISTRATION_VERSION,
-	0,
+	FLTFL_REGISTRATION_DO_NOT_SUPPORT_SERVICE_STOP,
 	NULL,
 	NULL,
 	UnregisterFilter,
@@ -155,6 +155,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID Unload(PDRIVER_OBJECT pDriverObject)
 {
+	DbgPrint("Unload() called\n");
 	unhook_ssdt_entries();
 	
 	CmUnRegisterCallback(cookie);
@@ -167,10 +168,9 @@ VOID Unload(PDRIVER_OBJECT pDriverObject)
 	cleanHiddenProcessList();
 }
  
- 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  	Description :
-//		Unregisters the minifilter.
+//  Description :
+//	Unregisters the minifilter.
 //	Parameters :
 //	Return value :
 //	Process :
@@ -178,10 +178,11 @@ VOID Unload(PDRIVER_OBJECT pDriverObject)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS UnregisterFilter(FLT_FILTER_UNLOAD_FLAGS flags)
 {
+	DbgPrint("UnloadFilter() called\n");
 	FltCloseCommunicationPort(serverPort);
 
 	if(filter!=NULL)
 		FltUnregisterFilter(filter);
 	
-	return STATUS_SUCCESS;
+	return STATUS_FLT_DO_NOT_DETACH;
 }

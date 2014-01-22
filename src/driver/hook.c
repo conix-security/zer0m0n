@@ -69,7 +69,7 @@ VOID unhook_ssdt_entries()
 	(ZWDELETEFILE)SYSTEMSERVICE(DELETEFILE_INDEX) = oldZwDeleteFile;
 	(ZWSETINFORMATIONFILE)SYSTEMSERVICE(SETINFORMATIONFILE_INDEX) = oldZwSetInformationFile;
 	(ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_INDEX) = oldZwQueryInformationFile;
-	
+
 	enable_cr0();
 }
 
@@ -141,7 +141,7 @@ VOID hook_ssdt_entries()
 	
 	oldZwQueryInformationFile = (ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_INDEX);
 	(ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_INDEX) = newZwQueryInformationFile;
-	
+
 	enable_cr0();
 }
 
@@ -1901,7 +1901,6 @@ NTSTATUS newZwQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusB
 
 	return statusCall;
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
