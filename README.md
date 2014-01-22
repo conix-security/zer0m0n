@@ -27,7 +27,7 @@ To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo 
   
     - run "patch -p1 < ./cuckoo.patch"
   
-    - copy the "zer0m0n.inf", "logs_dispatcher.exe" and "zer0m0n.sys" files into your /cuckoo/analyzer/windows/dll/ folder
+    - copy the "logs_dispatcher.exe" and "zer0m0n.sys" files into your /cuckoo/analyzer/windows/dll/ folder
    
  2- Open your virtual machine, it MUST run a "Windows XP x86" OS
 
@@ -78,10 +78,7 @@ Here is a list of such improvements to come :
 - anti detection features :
     + anti-vm detection* (cuckoo & virtual machine related files/processes/registry/connections)
     + hide threads (listing)
-    + Block SCM functions (driver protection)
 - handle machine poweroff
-- monitor SCM functions (services)
-- randomize driver and application names
 - detect process crashes (exploits ?)
 - monitor more events / functions
 - fix file deletion race condition
