@@ -104,6 +104,27 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	monitored_process_list = NULL;
 	hidden_process_list = NULL;
 	
+	// initialize every function pointers to null
+	oldZwMapViewOfSection = NULL;
+	oldZwSetContextThread = NULL;
+	oldZwCreateThread = NULL;
+	oldZwQueueApcThread = NULL;
+	oldZwCreateProcess = NULL;
+	oldZwSystemDebugControl = NULL;
+	oldZwCreateProcessEx = NULL;
+	oldZwWriteVirtualMemory = NULL;
+	oldZwDebugActiveProcess = NULL;
+	oldZwOpenProcess = NULL;
+	oldZwOpenThread = NULL;
+	oldZwQuerySystemInformation = NULL;
+	oldZwCreateFile = NULL;
+	oldZwReadFile = NULL;
+	oldZwWriteFile = NULL;
+	oldZwDeleteFile = NULL;
+	oldZwSetInformationFile = NULL;
+	oldZwQueryInformationFile = NULL;
+	
+	
    	status = FltRegisterFilter(pDriverObject,&registration,&filter);
 	if(!NT_SUCCESS(status))
 		return status;

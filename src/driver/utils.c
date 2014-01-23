@@ -46,13 +46,9 @@
 ULONG getTIDByHandle(HANDLE hThread)
 {
 	THREAD_BASIC_INFORMATION teb;
-	UNICODE_STRING func;
 	
-	RtlInitUnicodeString(&func, L"ZwQueryInformationThread");
-	
-	ZwQueryInformationThread = MmGetSystemRoutineAddress(&func);
 	if(ZwQueryInformationThread && hThread)
-		if(NT_SUCCESS(ZwQueryInformationThread(hThread, 0, &teb, sizeof(teb), NULL))
+		if(NT_SUCCESS(ZwQueryInformationThread(hThread, 0, &teb, sizeof(teb), NULL)))
 			return (ULONG)teb.ClientId.UniqueThread;
 	
 	return 0;
@@ -71,11 +67,7 @@ ULONG getTIDByHandle(HANDLE hThread)
 ULONG getPIDByHandle(HANDLE hProc)
 {
 	PROCESS_BASIC_INFORMATION peb;
-	UNICODE_STRING func;
 	
-	RtlInitUnicodeString(&func, L"ZwQueryInformationProcess");
-	
-	ZwQueryInformationProcess = MmGetSystemRoutineAddress(&func);
 	if(ZwQueryInformationProcess && hProc)
 		if(NT_SUCCESS(ZwQueryInformationProcess(hProc, 0, &peb, sizeof(PROCESS_BASIC_INFORMATION), NULL)))
 			return peb.UniqueProcessId;
@@ -119,8 +111,6 @@ NTSTATUS getProcNameByPID(ULONG pid, PUNICODE_STRING procName)
 	
 	ObDereferenceObject(eProcess);
 	
-	RtlInitUnicodeString(&func, L"ZwQueryInformationProcess");
-	ZwQueryInformationProcess = MmGetSystemRoutineAddress(&func);
 	if(!ZwQueryInformationProcess)
 		return STATUS_ILLEGAL_ELEMENT_ADDRESS;
 	

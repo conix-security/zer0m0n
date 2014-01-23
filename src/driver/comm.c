@@ -108,7 +108,7 @@ NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
 	}
 
 	status = getProcNameByPID(pid, &processName);
-	if(!NT_SUCCESS(status)))
+	if(!NT_SUCCESS(status))
 	{
 		KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
 		status = FltSendMessage(filter, &clientPort, "0,error,error,error", 19, NULL, 0, NULL);
