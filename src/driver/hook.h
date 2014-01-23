@@ -64,6 +64,7 @@
 #define DELETEFILE_INDEX 0x3e
 #define SETINFORMATIONFILE_INDEX 0xe0
 #define QUERYINFORMATIONFILE_INDEX 0x97
+#define CREATEMUTANT_INDEX 0x2B
 
 /////////////////////////////////////////////////////////////////////////////		
 // STRUCTS
@@ -196,6 +197,7 @@ typedef NTSTATUS(*ZWWRITEFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATU
 typedef NTSTATUS(*ZWDELETEFILE)(POBJECT_ATTRIBUTES);
 typedef NTSTATUS(*ZWSETINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
 typedef NTSTATUS(*ZWQUERYINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
+typedef NTSTATUS(*ZWCREATEMUTANT)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, BOOLEAN);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
@@ -220,6 +222,7 @@ ZWWRITEFILE oldZwWriteFile;
 ZWDELETEFILE oldZwDeleteFile;
 ZWSETINFORMATIONFILE oldZwSetInformationFile;
 ZWQUERYINFORMATIONFILE oldZwQueryInformationFile;
+ZWCREATEMUTANT oldZwCreateMutant;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
@@ -449,5 +452,15 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 //		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567052(v=vs.85).aspx
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlock, PVOID FileInformation, ULONG Length, FILE_INFORMATION_CLASS FileInformationClass);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs mutex creation
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, BOOLEAN InitialOwner);
 
 #endif
