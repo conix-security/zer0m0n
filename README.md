@@ -78,6 +78,7 @@ Here is a list of such improvements to come :
 - anti detection features :
     + anti-vm detection* (cuckoo & virtual machine related files/processes/registry/connections)
     + hide threads (listing)
+- retrieve filename on ZwCreateProcess* hooks
 - handle machine poweroff
 - detect process crashes (exploits ?)
 - monitor more events / functions
@@ -86,6 +87,7 @@ Here is a list of such improvements to come :
 - log registries callbacks return when possible
 - stop the analysis when a new driver is loaded during malware execution
 - signatures support for kernel analysis
+- win7 version (SSDT offsets / new syscalls hooks)
 - x64 version !!! clean : without SSDT hooks (:
 - etc.
 
