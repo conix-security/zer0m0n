@@ -104,7 +104,10 @@ VOID unhook_ssdt_entries()
 	
 	if(oldZwQueryInformationFile != NULL)
 		(ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_INDEX) = oldZwQueryInformationFile;
-
+	
+	if(oldZwCreateMutant != NULL)
+		(ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_INDEX) = oldZwCreateMutant;
+		
 	enable_cr0();
 }
 
@@ -177,6 +180,9 @@ VOID hook_ssdt_entries()
 	oldZwQueryInformationFile = (ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_INDEX);
 	(ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_INDEX) = newZwQueryInformationFile;
 
+	oldZwCreateMutant = (ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_INDEX);
+	(ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_INDEX) = newZwCreateMutant;
+	
 	enable_cr0();
 }
 
@@ -233,7 +239,7 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 				else
 					sendLogs(currentProcessId, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->ERROR,TID->ERROR,DesiredAccess->1");
 				ExFreePool(parameter);
-				return exceptionCode;
+				return statusCall;
 			}
 		
 			targetThreadId = getTIDByHandle(kThreadHandle);
@@ -400,7 +406,7 @@ NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 				else
 					sendLogs(currentProcessId, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->ERROR,ProcessName->ERROR,PID->ERROR,DesiredAccess->1");
 				ExFreePool(parameter);
-				return exceptionCode;
+				return statusCall;;
 			}
 		
 			targetProcessId = getPIDByHandle(kProcessHandle);
@@ -796,7 +802,7 @@ NTSTATUS newZwCreateProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, PO
 			ExFreePool(parameter);
 			if(kObjectName.Buffer)
 				ExFreePool(kObjectName.Buffer);
-			return exceptionCode;
+			return statusCall;;
 		}
 		
 		if(kRootDirectory && ObjectAttributes)	// handle the not null rootdirectory case
@@ -919,7 +925,7 @@ NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 			ExFreePool(parameter);
 			if(kObjectName.Buffer)
 				ExFreePool(kObjectName.Buffer);
-			return exceptionCode;
+			return statusCall;
 		}
 		
 		if(kRootDirectory && ObjectAttributes)	// handle the not null rootdirectory case
@@ -1102,7 +1108,7 @@ NTSTATUS newZwCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJ
 				sendLogs(currentProcessId, L"ZwCreateThread", L"0,-1,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
 			if(parameter)
 				ExFreePool(parameter);
-			return exceptionCode;
+			return statusCall;
 		}
 		
 		createdThreadId = getTIDByHandle(kThreadHandle);
@@ -1388,7 +1394,7 @@ NTSTATUS newZwCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 			ExFreePool(parameter);
 			if(kObjectName.Buffer)
 				ExFreePool(kObjectName.Buffer);
-			return exceptionCode;
+			return statusCall;
 		}
 		
 		if(kRootDirectory)	// handle the not null rootdirectory case
@@ -1636,7 +1642,7 @@ NTSTATUS newZwDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes)
 				ExFreePool(parameter);
 			if(kObjectName.Buffer)
 				ExFreePool(kObjectName.Buffer);
-			return exceptionCode;
+			return statusCall;
 		}
 		
 		if(NT_SUCCESS(statusCall))
@@ -1735,7 +1741,7 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 			}
 			if(parameter)
 				ExFreePool(parameter);
-			return exceptionCode;
+			return statusCall;
 		}
 		
 		// CHANGE FILE DISPOSITION INFORMATION CASE
@@ -1756,7 +1762,7 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 					sendLogs(currentProcessId, L"ZwSetInformationFile (Delete)", L"0,-1,sss,FileHandle->ERROR,FileName->ERROR,FileInformationClass->ERROR");
 				if(parameter)
 					ExFreePool(parameter);
-				return exceptionCode;
+				return statusCall;
 			}
 			
 			if(kDeleteFile == TRUE)
@@ -1828,7 +1834,7 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 					ExFreePool(parameter);
 				if(kFileName)
 					ExFreePool(kFileName);
-				return exceptionCode;
+				return statusCall;
 			}
 			
 			if(kRootDirectory)	// handle the not null RootDirectory case
@@ -1953,6 +1959,101 @@ NTSTATUS newZwQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusB
 			ExFreePool(parameter);
 	}
 
+	return statusCall;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs mutex creation
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, BOOLEAN InitialOwner)
+{
+	NTSTATUS statusCall, exceptionCode;
+	DWORD currentProcessId;
+	HANDLE kMutantHandle;
+	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
+	UNICODE_STRING kObjectName;
+	kObjectName.Buffer = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	statusCall = ((ZWCREATEMUTANT)(oldZwCreateMutant))(MutantHandle, DesiredAccess, ObjectAttributes, InitialOwner);
+	
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		
+		__try
+		{
+			if(ExGetPreviousMode() != KernelMode)
+			{
+				ProbeForRead(MutantHandle, sizeof(HANDLE), 1);
+				ProbeForRead(ObjectAttributes, sizeof(OBJECT_ATTRIBUTES), 1);
+				ProbeForRead(ObjectAttributes->ObjectName, sizeof(UNICODE_STRING), 1);
+				ProbeForRead(ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length, 1);
+			}
+			kMutantHandle = *MutantHandle;
+			kObjectName.Length = ObjectAttributes->ObjectName->Length;
+			kObjectName.MaximumLength = ObjectAttributes->ObjectName->Length;
+			kObjectName.Buffer = ExAllocatePoolWithTag(NonPagedPool, kObjectName.MaximumLength, BUFFER_TAG);
+			if(kObjectName.Buffer)
+				RtlCopyUnicodeString(&kObjectName, ObjectAttributes->ObjectName);
+			else
+			{
+				sendLogs(currentProcessId ,L"ZwCreateMutant", L"0,-1,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,ObjectAttributes->ERROR,InitialOwner->ERROR");
+				if(parameter)
+					ExFreePool(parameter);
+				return statusCall;
+			}
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,ObjectAttributes->ERROR,InitialOwner->ERROR", exceptionCode)))
+				sendLogs(currentProcessId, L"ZwCreateMutant", parameter);
+			else 
+				sendLogs(currentProcessId ,L"ZwCreateMutant", L"0,-1,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,ObjectAttributes->ERROR,InitialOwner->ERROR");
+			if(parameter)
+				ExFreePool(parameter);
+			if(kObjectName.Buffer)
+				ExFreePool(kObjectName.Buffer);
+			return statusCall;
+		}
+	
+		if(NT_SUCCESS(statusCall))
+		{
+			log_lvl = LOG_SUCCESS;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,0,ssss,MutantHandle->0x%08x,DesiredAccess->0x%08x,MutexName->%wZ,InitialOwner->%d", kMutantHandle, DesiredAccess, &kObjectName, InitialOwner)))
+				log_lvl = LOG_PARAM;
+		}
+		else
+		{
+			log_lvl = LOG_ERROR;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,ssss,MutantHandle->0x%08x,DesiredAccess->0x%08x,MutexName->%wZ,InitialOwner->%d", statusCall, kMutantHandle, DesiredAccess, &kObjectName, InitialOwner)))
+				log_lvl = LOG_PARAM;
+		}
+		
+		switch(log_lvl)
+		{
+			case LOG_PARAM:
+				sendLogs(currentProcessId, L"ZwCreateMutant", parameter);
+			break;
+			case LOG_SUCCESS:
+				sendLogs(currentProcessId, L"ZwCreateMutant", L"0,-1,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,ObjectAttributes->ERROR,InitialOwner->ERROR");
+			break;
+			default:
+				sendLogs(currentProcessId, L"ZwCreateMutant", L"1,0,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,ObjectAttributes->ERROR,InitialOwner->ERROR");
+			break;
+		}
+		if(kObjectName.Buffer)
+			ExFreePool(kObjectName.Buffer);
+		if(parameter)
+			ExFreePool(parameter);
+	}
 	return statusCall;
 }
 

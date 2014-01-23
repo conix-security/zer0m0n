@@ -215,6 +215,7 @@ const char *logtbl[] = {
     "ZwSetInformationFile (Delete)",
     "ZwSetInformationFile (Rename)",
     "ZwQueryInformationFile",
+    "ZwCreateMutant",
     NULL
 };
 char logtbl_explained[sizeof(logtbl)/sizeof(char *)] = {0};
