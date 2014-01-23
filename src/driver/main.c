@@ -42,7 +42,7 @@ FLT_REGISTRATION registration =
 {
 	sizeof(FLT_REGISTRATION),
 	FLT_REGISTRATION_VERSION,
-	FLTFL_REGISTRATION_DO_NOT_SUPPORT_SERVICE_STOP,
+	FLTFL_REGISTRATION_DO_NOT_SUPPORT_SERVICE_STOP,		// block service stop
 	NULL,
 	NULL,
 	UnregisterFilter,
@@ -87,59 +87,51 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	 
 	RtlInitUnicodeString(&usDriverName, L"\\Device\\DriverSSDT");
 	RtlInitUnicodeString(&usDosDeviceName, L"\\DosDevices\\DriverSSDT"); 
-
 	status = IoCreateDevice(pDriverObject, 0, &usDriverName, FILE_DEVICE_UNKNOWN, 0, FALSE, &pDeviceObject);
+	if(!NT_SUCCESS(status))
+		return status;
+	
+	status = IoCreateSymbolicLink(&usDosDeviceName, &usDriverName);
+	if(!NT_SUCCESS(status))
+		return status;
+	
 	pDeviceObject->Flags |= DO_BUFFERED_IO;
 	pDeviceObject->Flags &= (~DO_DEVICE_INITIALIZING);
+	for(i=0; i<IRP_MJ_MAXIMUM_FUNCTION; i++)
+		pDriverObject->MajorFunction[i] = ioctl_NotSupported;
+	pDriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = ioctl_DeviceControl;
 	
-	if(NT_SUCCESS(status))
-    {
-		#ifdef DEBUG
-        DbgPrint("[+] Device driver created\n");
-		#endif
-		
-		IoCreateSymbolicLink(&usDosDeviceName, &usDriverName);
-		
-		for(i=0; i<IRP_MJ_MAXIMUM_FUNCTION; i++)
-			pDriverObject->MajorFunction[i] = ioctl_NotSupported;
-        	pDriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = ioctl_DeviceControl;
-	}
-
 	monitored_process_list = NULL;
 	hidden_process_list = NULL;
 	
    	status = FltRegisterFilter(pDriverObject,&registration,&filter);
-	if(NT_SUCCESS(status))
-    {
-		RtlInitUnicodeString(&filterPortName, L"\\FilterPort");
-		FltBuildDefaultSecurityDescriptor(&securityDescriptor, FLT_PORT_ALL_ACCESS);
-		InitializeObjectAttributes(&objAttr, &filterPortName, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, NULL, securityDescriptor); 
-		status = FltCreateCommunicationPort(filter, &serverPort, &objAttr, NULL, ConnectCallback, DisconnectCallback, NULL, 1);
-		if(!NT_SUCCESS(status))
-		{
-			#ifdef DEBUG
-			DbgPrint("FltCreateCommunicationPort() failed ! : 0x%08x\n", status);
-			#endif
-			return status;
-		}
-		FltFreeSecurityDescriptor(securityDescriptor);
-	}
-	else
-	{
-		#ifdef DEBUG
-		DbgPrint("FltRegisterFilter failed : 0x%08x\n", status);
-		#endif
+	if(!NT_SUCCESS(status))
 		return status;
-	}
+	
+	
+	RtlInitUnicodeString(&filterPortName, L"\\FilterPort");
+	status = FltBuildDefaultSecurityDescriptor(&securityDescriptor, FLT_PORT_ALL_ACCESS);
+	if(!NT_SUCCESS(status))
+		return status;
+	
+	InitializeObjectAttributes(&objAttr, &filterPortName, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, NULL, securityDescriptor); 
+	
+	status = FltCreateCommunicationPort(filter, &serverPort, &objAttr, NULL, ConnectCallback, DisconnectCallback, NULL, 1);
+	FltFreeSecurityDescriptor(securityDescriptor);
+	if(!NT_SUCCESS(status))
+		return status;
 	
 	KeInitializeMutex(&mutex, 0);
-
-	hook_ssdt_entries();
 	
 	status = CmRegisterCallback(regCallback, NULL, &cookie);
+	if(!NT_SUCCESS(status))
+		return status;
 	
 	status = PsSetLoadImageNotifyRoutine(imageCallback);
+	if(!NT_SUCCESS(status))
+		return status;
 	
+	hook_ssdt_entries();
 	pDriverObject->DriverUnload = Unload;
 	
 	return STATUS_SUCCESS;
@@ -155,12 +147,11 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID Unload(PDRIVER_OBJECT pDriverObject)
 {
-	DbgPrint("Unload() called\n");
 	unhook_ssdt_entries();
 	
 	CmUnRegisterCallback(cookie);
 	PsRemoveLoadImageNotifyRoutine(imageCallback);
-
+	
 	IoDeleteSymbolicLink(&usDosDeviceName);
 	IoDeleteDevice(pDriverObject->DeviceObject);
 	
@@ -178,9 +169,8 @@ VOID Unload(PDRIVER_OBJECT pDriverObject)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS UnregisterFilter(FLT_FILTER_UNLOAD_FLAGS flags)
 {
-	DbgPrint("UnloadFilter() called\n");
 	FltCloseCommunicationPort(serverPort);
-
+	
 	if(filter!=NULL)
 		FltUnregisterFilter(filter);
 	

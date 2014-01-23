@@ -59,6 +59,7 @@ NTSTATUS regCallback (PVOID CallbackContext, PVOID Argument1, PVOID Argument2)
 	pwBuf = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), BUFFER_TAG);
 	if(pwBuf == NULL)
 		return STATUS_SUCCESS;
+	
 	tmp = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE*sizeof(WCHAR), TEMP_TAG);
 	if(tmp == NULL)
 	{
