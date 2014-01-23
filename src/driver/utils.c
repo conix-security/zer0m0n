@@ -37,23 +37,21 @@
 //	Description :
 //		Retrieves and returns the thread identifier from its handle.
 //	Parameters :
-//		_in_ HANDLE hThread : Thread handle. If NULL, does NOT retrieves current thread identifier.
+//		_in_ HANDLE hThread : Thread handle.
 //	Return value :
-//		ULONG : Thread Identifier.
-//	TODO : test hThread == 0 ?
-//	TODO : get Zw*
+//		ULONG : Thread Identifier or NULL if failure.
+//	TODO :
+//		Place function retrieval at startup / dynamic import.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ULONG getTIDByHandle(HANDLE hThread)
 {
 	THREAD_BASIC_INFORMATION teb;
-	UNICODE_STRING func;
 	
-	RtlInitUnicodeString(&func, L"ZwQueryInformationThread");
+	if(hThread)
+		if(NT_SUCCESS(ZwQueryInformationThread(hThread, 0, &teb, sizeof(teb), NULL)))
+			return (ULONG)teb.ClientId.UniqueThread;
 	
-	ZwQueryInformationThread = MmGetSystemRoutineAddress(&func);
-	ZwQueryInformationThread(hThread, 0, &teb, sizeof(teb), NULL);
-	
-	return (ULONG)teb.ClientId.UniqueThread;
+	return 0;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,19 +67,11 @@ ULONG getTIDByHandle(HANDLE hThread)
 ULONG getPIDByHandle(HANDLE hProc)
 {
 	PROCESS_BASIC_INFORMATION peb;
-	UNICODE_STRING func;
 	
-	RtlInitUnicodeString(&func, L"ZwQueryInformationProcess");
+	if(hProc)
+		if(NT_SUCCESS(ZwQueryInformationProcess(hProc, 0, &peb, sizeof(PROCESS_BASIC_INFORMATION), NULL)))
+			return peb.UniqueProcessId;
 	
-	ZwQueryInformationProcess = MmGetSystemRoutineAddress(&func);
-	if(ZwQueryInformationProcess)
-	{
-		if(hProc)
-		{
-			if(NT_SUCCESS(ZwQueryInformationProcess(hProc, 0, &peb, sizeof(PROCESS_BASIC_INFORMATION), NULL)))
-				return peb.UniqueProcessId;
-		}
-	}
 	return 0;
 }
 
@@ -94,13 +84,8 @@ ULONG getPIDByHandle(HANDLE hProc)
 //		_out_ PUNICODE_STRING : Caller allocated UNICODE_STRING, process name.
 //	Return value :
 //		NTSTATUS : STATUS_SUCCESS if no error was encountered, otherwise, relevant NTSTATUS code.
-//	TODO : si pas assez de place dans le buffer donné, retourner une erreur spécifique
-//	TODO : si handle invalide, retourner une erreur spécifique
 //	TODO : check PAGED_CODE ?
-//	TODO : ifdef debug
 //	TODO : Zw*
-//	TODO : check return des fonctions
-//	TODO : check return du code
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS getProcNameByPID(ULONG pid, PUNICODE_STRING procName)
 {
@@ -111,43 +96,36 @@ NTSTATUS getProcNameByPID(ULONG pid, PUNICODE_STRING procName)
 	UNICODE_STRING func;
 	PVOID buffer = NULL;
 	PUNICODE_STRING imageName = NULL;
+	
+	if(pid == 0 || procName == NULL)
+		return STATUS_INVALID_PARAMETER;
 
-	PAGED_CODE();
 	status = PsLookupProcessByProcessId((HANDLE)pid, &eProcess);
+	if(!NT_SUCCESS(status))
+		return status;
 	
-	if(NT_SUCCESS(status))
-	{
-		status = ObOpenObjectByPointer(eProcess,0, NULL, 0,0,KernelMode,&hProcess);
-		if(!NT_SUCCESS(status))
-			DbgPrint("ObOpenObjectByPointer Failed: %08x\n", status);
-		ObDereferenceObject(eProcess);
-	}
-	else 
-		DbgPrint("PsLookupProcessByProcessId Failed: %08x\n", status);
+	status = ObOpenObjectByPointer(eProcess,0, NULL, 0,0,KernelMode,&hProcess);
+	if(!NT_SUCCESS(status))
+		return status;
 	
-	RtlInitUnicodeString(&func, L"ZwQueryInformationProcess");
-	ZwQueryInformationProcess = MmGetSystemRoutineAddress(&func);
-	
-	if(hProcess)
-		ZwQueryInformationProcess(hProcess, ProcessImageFileName, NULL, 0, &returnedLength);
-	else
-		return STATUS_DATA_ERROR;
+	ObDereferenceObject(eProcess);
+	ZwQueryInformationProcess(hProcess, ProcessImageFileName, NULL, 0, &returnedLength);
 	
 	buffer = ExAllocatePoolWithTag(PagedPool, returnedLength, BUF_POOL_TAG);
-	if(buffer != NULL)
+	if(!buffer)
+		return STATUS_NO_MEMORY;
+
+	status = ZwQueryInformationProcess(hProcess, ProcessImageFileName, buffer, returnedLength, &returnedLength);
+	if(NT_SUCCESS(status))
 	{
-		status = ZwQueryInformationProcess(hProcess, ProcessImageFileName, buffer, returnedLength, &returnedLength);
-			
-		if(NT_SUCCESS(status))
-		{
-			imageName = (PUNICODE_STRING)buffer;
+		imageName = (PUNICODE_STRING)buffer;
+		if(procName->MaximumLength > imageName->Length)
 			RtlCopyUnicodeString(procName, imageName);
-		}
-		ExFreePool(buffer);
-		return status;
-	}	
-	else
-		return STATUS_DATA_ERROR;
+		else
+			status = STATUS_BUFFER_TOO_SMALL;
+	}
+	ExFreePool(buffer);
+	return status;
 }
 
 

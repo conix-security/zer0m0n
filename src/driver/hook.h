@@ -197,7 +197,6 @@ typedef NTSTATUS(*ZWDELETEFILE)(POBJECT_ATTRIBUTES);
 typedef NTSTATUS(*ZWSETINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
 typedef NTSTATUS(*ZWQUERYINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
 
-
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
 /////////////////////////////////////////////////////////////////////////////

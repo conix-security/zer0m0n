@@ -46,23 +46,19 @@
 NTSTATUS startMonitoringProcess(ULONG new_pid)
 {
 	PMONITORED_PROCESS_ENTRY new_entry;
+	
 	if(new_pid == 0)
-		return -1;
+		return STATUS_INVALID_PARAMETER;
 	if(isProcessMonitoredByPid(new_pid))
 		return STATUS_SUCCESS;
 	
 	new_entry = (PMONITORED_PROCESS_ENTRY)ExAllocatePoolWithTag(NonPagedPool,sizeof(MONITORED_PROCESS_ENTRY),MONIT_POOL_TAG);
-	
 	if(new_entry == NULL)
-		return -1;
+		return STATUS_NO_MEMORY;
 		
 	new_entry->pid = new_pid;
 	new_entry->flink = monitored_process_list;
 	monitored_process_list = new_entry;
-	
-	#ifdef DEBUG
-	DbgPrint("(DRIVER_SSDT) Start monitoring : %d\n", new_entry->pid);
-	#endif
 	
 	return STATUS_SUCCESS;
 }
@@ -81,22 +77,17 @@ NTSTATUS addHiddenProcess(ULONG new_pid)
 {
 	PHIDDEN_PROCESS new_entry;
 	if(new_pid == 0)
-		return -1;
+		return STATUS_INVALID_PARAMETER;
 	if(isProcessHiddenByPid(new_pid))
 		return STATUS_SUCCESS;
 	
 	new_entry = (PHIDDEN_PROCESS)ExAllocatePoolWithTag(NonPagedPool,sizeof(HIDDEN_PROCESS),MONIT_POOL_TAG);
-	
 	if(new_entry == NULL)
-		return -1;
+		return STATUS_NO_MEMORY;
 		
 	new_entry->pid = new_pid;
 	new_entry->flink = hidden_process_list;
 	hidden_process_list = new_entry;
-	
-	#ifdef DEBUG
-	DbgPrint("(DRIVER_SSDT) Hide process : %d\n", new_entry->pid);
-	#endif
 	
 	return STATUS_SUCCESS;
 }
@@ -114,9 +105,8 @@ NTSTATUS addHiddenProcess(ULONG new_pid)
 NTSTATUS stopMonitoringProcess(ULONG existing_pid)
 {
 	PMONITORED_PROCESS_ENTRY currentMember, prevMember;
-	
 	if(existing_pid == 0)
-		return -1;
+		return STATUS_INVALID_PARAMETER;
 		
 	prevMember = NULL;
 	currentMember = monitored_process_list;
@@ -220,7 +210,6 @@ NTSTATUS cleanHiddenProcessList()
 BOOLEAN isProcessMonitoredByPid(ULONG pid)
 {
 	PMONITORED_PROCESS_ENTRY ptr;
-	
 	if(pid == 0)
 		return FALSE;
 		

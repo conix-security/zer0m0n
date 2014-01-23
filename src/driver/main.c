@@ -42,7 +42,7 @@ FLT_REGISTRATION registration =
 {
 	sizeof(FLT_REGISTRATION),
 	FLT_REGISTRATION_VERSION,
-	0,
+	FLTFL_REGISTRATION_DO_NOT_SUPPORT_SERVICE_STOP,		// block service stop
 	NULL,
 	NULL,
 	UnregisterFilter,
@@ -80,66 +80,86 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	PDEVICE_OBJECT pDeviceObject;
 	UNICODE_STRING usDriverName;
 	UNICODE_STRING filterPortName;
+	UNICODE_STRING function;
 	OBJECT_ATTRIBUTES objAttr;
 	PSECURITY_DESCRIPTOR securityDescriptor;
 	NTSTATUS status;
 	ULONG i;
 	 
+	// import some functions we will need
+	RtlInitUnicodeString(&function, L"ZwQueryInformationThread");
+	ZwQueryInformationThread = MmGetSystemRoutineAddress(&function);
+	RtlInitUnicodeString(&function, L"ZwQueryInformationProcess");
+	ZwQueryInformationProcess = MmGetSystemRoutineAddress(&function);
+	
 	RtlInitUnicodeString(&usDriverName, L"\\Device\\DriverSSDT");
 	RtlInitUnicodeString(&usDosDeviceName, L"\\DosDevices\\DriverSSDT"); 
-
 	status = IoCreateDevice(pDriverObject, 0, &usDriverName, FILE_DEVICE_UNKNOWN, 0, FALSE, &pDeviceObject);
+	if(!NT_SUCCESS(status))
+		return status;
+	
+	status = IoCreateSymbolicLink(&usDosDeviceName, &usDriverName);
+	if(!NT_SUCCESS(status))
+		return status;
+	
 	pDeviceObject->Flags |= DO_BUFFERED_IO;
 	pDeviceObject->Flags &= (~DO_DEVICE_INITIALIZING);
+	for(i=0; i<IRP_MJ_MAXIMUM_FUNCTION; i++)
+		pDriverObject->MajorFunction[i] = ioctl_NotSupported;
+	pDriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = ioctl_DeviceControl;
 	
-	if(NT_SUCCESS(status))
-    {
-		#ifdef DEBUG
-        DbgPrint("[+] Device driver created\n");
-		#endif
-		
-		IoCreateSymbolicLink(&usDosDeviceName, &usDriverName);
-		
-		for(i=0; i<IRP_MJ_MAXIMUM_FUNCTION; i++)
-			pDriverObject->MajorFunction[i] = ioctl_NotSupported;
-        	pDriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = ioctl_DeviceControl;
-	}
-
 	monitored_process_list = NULL;
 	hidden_process_list = NULL;
 	
+	// initialize every function pointers to null
+	oldZwMapViewOfSection = NULL;
+	oldZwSetContextThread = NULL;
+	oldZwCreateThread = NULL;
+	oldZwQueueApcThread = NULL;
+	oldZwCreateProcess = NULL;
+	oldZwSystemDebugControl = NULL;
+	oldZwCreateProcessEx = NULL;
+	oldZwWriteVirtualMemory = NULL;
+	oldZwDebugActiveProcess = NULL;
+	oldZwOpenProcess = NULL;
+	oldZwOpenThread = NULL;
+	oldZwQuerySystemInformation = NULL;
+	oldZwCreateFile = NULL;
+	oldZwReadFile = NULL;
+	oldZwWriteFile = NULL;
+	oldZwDeleteFile = NULL;
+	oldZwSetInformationFile = NULL;
+	oldZwQueryInformationFile = NULL;
+	
+	
    	status = FltRegisterFilter(pDriverObject,&registration,&filter);
-	if(NT_SUCCESS(status))
-    {
-		RtlInitUnicodeString(&filterPortName, L"\\FilterPort");
-		FltBuildDefaultSecurityDescriptor(&securityDescriptor, FLT_PORT_ALL_ACCESS);
-		InitializeObjectAttributes(&objAttr, &filterPortName, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, NULL, securityDescriptor); 
-		status = FltCreateCommunicationPort(filter, &serverPort, &objAttr, NULL, ConnectCallback, DisconnectCallback, NULL, 1);
-		if(!NT_SUCCESS(status))
-		{
-			#ifdef DEBUG
-			DbgPrint("FltCreateCommunicationPort() failed ! : 0x%08x\n", status);
-			#endif
-			return status;
-		}
-		FltFreeSecurityDescriptor(securityDescriptor);
-	}
-	else
-	{
-		#ifdef DEBUG
-		DbgPrint("FltRegisterFilter failed : 0x%08x\n", status);
-		#endif
+	if(!NT_SUCCESS(status))
 		return status;
-	}
+	
+	
+	RtlInitUnicodeString(&filterPortName, L"\\FilterPort");
+	status = FltBuildDefaultSecurityDescriptor(&securityDescriptor, FLT_PORT_ALL_ACCESS);
+	if(!NT_SUCCESS(status))
+		return status;
+	
+	InitializeObjectAttributes(&objAttr, &filterPortName, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, NULL, securityDescriptor); 
+	
+	status = FltCreateCommunicationPort(filter, &serverPort, &objAttr, NULL, ConnectCallback, DisconnectCallback, NULL, 1);
+	FltFreeSecurityDescriptor(securityDescriptor);
+	if(!NT_SUCCESS(status))
+		return status;
 	
 	KeInitializeMutex(&mutex, 0);
-
-	hook_ssdt_entries();
 	
 	status = CmRegisterCallback(regCallback, NULL, &cookie);
+	if(!NT_SUCCESS(status))
+		return status;
 	
 	status = PsSetLoadImageNotifyRoutine(imageCallback);
+	if(!NT_SUCCESS(status))
+		return status;
 	
+	hook_ssdt_entries();
 	pDriverObject->DriverUnload = Unload;
 	
 	return STATUS_SUCCESS;
@@ -159,7 +179,7 @@ VOID Unload(PDRIVER_OBJECT pDriverObject)
 	
 	CmUnRegisterCallback(cookie);
 	PsRemoveLoadImageNotifyRoutine(imageCallback);
-
+	
 	IoDeleteSymbolicLink(&usDosDeviceName);
 	IoDeleteDevice(pDriverObject->DeviceObject);
 	
@@ -167,10 +187,9 @@ VOID Unload(PDRIVER_OBJECT pDriverObject)
 	cleanHiddenProcessList();
 }
  
- 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  	Description :
-//		Unregisters the minifilter.
+//  Description :
+//	Unregisters the minifilter.
 //	Parameters :
 //	Return value :
 //	Process :
@@ -179,9 +198,9 @@ VOID Unload(PDRIVER_OBJECT pDriverObject)
 NTSTATUS UnregisterFilter(FLT_FILTER_UNLOAD_FLAGS flags)
 {
 	FltCloseCommunicationPort(serverPort);
-
+	
 	if(filter!=NULL)
 		FltUnregisterFilter(filter);
 	
-	return STATUS_SUCCESS;
+	return STATUS_FLT_DO_NOT_DETACH;
 }

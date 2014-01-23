@@ -75,6 +75,18 @@
 #define GENERIC_SUCCESS_MESSAGE L"0,-1,s,ERROR";
 
 /////////////////////////////////////////////////////////////////////////////
+// STRUCTS
+/////////////////////////////////////////////////////////////////////////////
+
+typedef NTSTATUS (*ZWQUERYINFORMATIONPROCESS)(HANDLE,ULONG,PVOID,ULONG,PULONG);
+typedef NTSTATUS (*ZWQUERYINFORMATIONTHREAD)(HANDLE,ULONG,PVOID,ULONG,PULONG);
+
+// specific imports
+ZWQUERYINFORMATIONPROCESS ZwQueryInformationProcess;
+ZWQUERYINFORMATIONTHREAD ZwQueryInformationThread;
+
+
+/////////////////////////////////////////////////////////////////////////////
 // GLOBALS 
 /////////////////////////////////////////////////////////////////////////////
 
@@ -115,7 +127,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 VOID Unload(PDRIVER_OBJECT pDriverObject);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  	Description :
+//  Description :
 //		Unregisters the minifilter.
 //	Parameters :
 //	Return value :

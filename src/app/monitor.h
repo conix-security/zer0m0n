@@ -62,7 +62,7 @@ PMONITORED_PROCESS_ENTRY monitored_process_list;
 //		_in_ ULONG new_pid : Process Identifier.
 //		_in_ int new_sock : socket associated with this pid
 //	Return value :
-//		int : 1 if no error was encountered, otherwise, returns -1.
+//		int : 0 if success, -1 if not.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int startMonitoringProcess(ULONG new_pid, int new_sock);
 
@@ -72,22 +72,29 @@ int startMonitoringProcess(ULONG new_pid, int new_sock);
 //	Parameters :
 //		_in_ ULONG pid : Process Identifier.
 //	Return value :
-//		BOOLEAN : TRUE if found, FALSE if not.
-//	Process :
-//		Walks through the linked list, returns TRUE if "pid" is found.
+//		int : 0 if found, -1 if not.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-BOOLEAN isProcessMonitoredByPid(ULONG pid);
+int isProcessMonitoredByPid(ULONG pid);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Returns socket identifier associated with the pid given in parameter
+//		Returns socket identifier associated with the pid given in parameter.
 //	Parameters :
 //		_in_ ULONG pid : Process Identifier.
 //	Return value :
-//		int : Socket Identifier
-//	Process :
-//		Walks through the linked list, returns the socket id if "pid" is found.
+//		int : Socket Identifier or -1 if error.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int getSockIdFromPid(ULONG pid);
+int getMonitoredProcessSocket(ULONG pid);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Updates a PID-related socket
+//	Parameters :
+//		_in_ ULONG pid : Process Identifier.
+//		_in_ int new_sock : Socket
+//	Return value :
+//		int : 0 if success, -1 if not.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+int setMonitoredProcessSocket(ULONG pid, int new_sock);
 
 #endif

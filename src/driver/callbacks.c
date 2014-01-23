@@ -49,8 +49,8 @@
 VOID imageCallback(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_INFO ImageInfo)
 {	
 	NTSTATUS status = STATUS_SUCCESS;
-	PWCHAR pwBuf;
-	ULONG pid;
+	PWCHAR pwBuf = NULL;
+	ULONG pid = 0;
 
 	if(ImageInfo != NULL)
 	{
@@ -59,22 +59,21 @@ VOID imageCallback(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_INFO 
 		if(monitored_process_list && ImageInfo->SystemModeImage)
 		{
 			pwBuf = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), BUF_POOL_TAG);
-			status = RtlStringCchPrintfW(pwBuf, MAXSIZE, L"1,%d,s,DriverName->%wZ", status, FullImageName);
-			if(status == STATUS_BUFFER_OVERFLOW || status == STATUS_SUCCESS)
+			if(!pwBuf)
 			{
-				#ifdef DEBUG
-				DbgPrint("DRIVER LOADED : %wZ (%d)\n", FullImageName, pid);
-				#endif
-				sendLogs(pid,L"LOAD_DRIVER", pwBuf);
-			}
-			else
-			{
-				#ifdef DEBUG
-				DbgPrint("DRIVER LOADED : %wZ (%d)\n", FullImageName, pid);
-				#endif
 				sendLogs(pid,L"LOAD_DRIVER", L"1,0,s,DriverName->undefined");
+				return;
 			}
-			ExFreePool(pwBuf);	
+			
+			status = RtlStringCchPrintfW(pwBuf, MAXSIZE, L"1,%d,s,DriverName->%wZ", status, FullImageName);
+			if(status != STATUS_BUFFER_OVERFLOW || status != STATUS_SUCCESS)
+			{
+				sendLogs(pid,L"LOAD_DRIVER", L"1,0,s,DriverName->undefined");
+				ExFreePool(pwBuf);
+				return;
+			}
+			sendLogs(pid,L"LOAD_DRIVER", pwBuf);
+			ExFreePool(pwBuf);
 		}
 	}
 }

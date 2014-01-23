@@ -88,35 +88,64 @@ VOID DisconnectCallback(PVOID ConnectionCookie)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
 {
-	NTSTATUS status;
+	NTSTATUS status = STATUS_SUCCESS;
 	CHAR buf[MAXSIZE];
 	UNICODE_STRING processName;
 	ULONG sizeBuf;
 	
+	if(message == NULL)
+		return STATUS_INVALID_PARAMETER;
+	
 	processName.Length = 0;
 	processName.MaximumLength = NTSTRSAFE_UNICODE_STRING_MAX_CCH * sizeof(WCHAR);
 	processName.Buffer = ExAllocatePoolWithTag(NonPagedPool, processName.MaximumLength, PROCNAME_TAG);
-	if(processName.Buffer != NULL)
-		status = getProcNameByPID(pid, &processName);
-	
-
-	status = STATUS_SUCCESS;
-	if(NT_SUCCESS(RtlStringCbPrintfA(buf, MAXSIZE, "%d,%wZ,%ws,%ws\n", pid, &processName, message, parameter)))
+	if(!processName.Buffer)
 	{
-		RtlStringCbLengthA(buf, MAXSIZE, &sizeBuf);
+		DbgPrint("ProcessName.Buffer error\n");
 		KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
-		status = FltSendMessage(filter, &clientPort, buf, sizeBuf, NULL, 0, NULL);
+		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, NULL);
+		KeReleaseMutex(&mutex, FALSE);
+		return STATUS_NO_MEMORY;
 	}
-	else
-	{
-		KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
-		status = FltSendMessage(filter, &clientPort, "0,error,error,error", 19, NULL, 0, NULL);
-	}
-	
-	KeReleaseMutex(&mutex, FALSE);
 
-	if(processName.Buffer != NULL)
+	status = getProcNameByPID(pid, &processName);
+	if(!NT_SUCCESS(status))
+	{
+		DbgPrint("getProcNameByPID() error\n");
+		KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
+		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, NULL);
+		KeReleaseMutex(&mutex, FALSE);
 		ExFreePool(processName.Buffer);
+		return status;
+	}
+	
+	status = RtlStringCbPrintfA(buf, MAXSIZE, "%d,%wZ,%ws,%ws\n", pid, &processName, message, parameter);
+	if(!NT_SUCCESS(status) || status == STATUS_BUFFER_OVERFLOW)
+	{
+		DbgPrint("RtlStringCbPrintfA() error\n");
+		KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
+		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, NULL);
+		KeReleaseMutex(&mutex, FALSE);
+		ExFreePool(processName.Buffer);
+		return status;
+	}
+	
+	status = RtlStringCbLengthA(buf, MAXSIZE, &sizeBuf);
+	if(!NT_SUCCESS(status))
+	{
+		DbgPrint("RtlStringCbLengthA() error\n");
+		KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
+		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, NULL);
+		KeReleaseMutex(&mutex, FALSE);
+		ExFreePool(processName.Buffer);
+		return status;
+	}
+	
+
+	KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
+	status = FltSendMessage(filter, &clientPort, buf, sizeBuf, NULL, 0, NULL);
+	KeReleaseMutex(&mutex, FALSE);
+	ExFreePool(processName.Buffer);
 
 	return status;
 }
@@ -140,36 +169,48 @@ NTSTATUS ioctl_NotSupported(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	return STATUS_SUCCESS;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Parses received PIDs IOCTL from analyzer.py and adds ths PIDs in the hidden and monitored
+//		lists.
+//	Parameters :
+//		IRP buffer data.
+//	Return value :
+//		NTSTATUS : STATUS_SUCCESS on success.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS parse_pids(PCHAR pids)
 {
-	PCHAR start,current,data;
+	PCHAR start = NULL, current = NULL, data = NULL;
 	ULONG len, pid;
-	BOOLEAN first_pid=TRUE;
+	BOOLEAN first_pid = TRUE;
 	NTSTATUS status;
-
-	DbgPrint("debut parse_pids, pids : %s\n", pids);
 	
-	RtlStringCbLengthA(pids, MAXSIZE, &len);
+	if(pids == NULL)
+		return STATUS_INVALID_PARAMETER;
+	
+	status = RtlStringCbLengthA(pids, MAXSIZE, &len);
+	if(!NT_SUCCESS(status))
+		return status;
+	
 	data = ExAllocatePoolWithTag(NonPagedPool, len+1, TEMP_TAG);
 	if(data == NULL)
-		return -1;
-	DbgPrint("avant RtlStringCbPrintfA\n");
-	if(!NT_SUCCESS(RtlStringCbPrintfA(data, len+1, "%s", pids)))
+		return STATUS_NO_MEMORY;
+	
+	status = RtlStringCbPrintfA(data, len+1, "%s", pids);
+	if(!NT_SUCCESS(status))
 	{
 		ExFreePool(data);
-		return -1;
+		return status;
 	}
 	
 	start = data;
 	current = data;
 	
-	DbgPrint("avant *current != 0x00\n");
 	while(*current != 0x00)
 	{
 		if(*current == '_' && current!=start)
 		{
 			*current = 0x00;
-			DbgPrint("start : %s\n", start);
 			status = RtlCharToInteger(start, 10, &pid);
 			if(NT_SUCCESS(status) && pid!=0)
 			{
@@ -188,9 +229,7 @@ NTSTATUS parse_pids(PCHAR pids)
 	
 	if(start != current)
 	{
-		DbgPrint("start : %s\n", start);
 		status = RtlCharToInteger(start, 10, &pid);
-		DbgPrint("pid : %d\n", pid);
 		if(NT_SUCCESS(status) && pid!=0)
 		{
 			if(first_pid)
@@ -198,9 +237,7 @@ NTSTATUS parse_pids(PCHAR pids)
 			else
 				addHiddenProcess(pid);
 		}	
-	}
-	
-	DbgPrint("apres le while\n");
+	}	
 	ExFreePool(data);
 	
 	return STATUS_SUCCESS;
@@ -224,8 +261,8 @@ NTSTATUS parse_pids(PCHAR pids)
 NTSTATUS ioctl_DeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
 	NTSTATUS status = STATUS_SUCCESS;
-	PIO_STACK_LOCATION pIoStackIrp;
-	PCHAR outputBuffer;
+	PIO_STACK_LOCATION pIoStackIrp = NULL;
+	PCHAR outputBuffer = NULL;
 	DWORD sizeBuf;
 	ULONG pid;
 
@@ -235,25 +272,15 @@ NTSTATUS ioctl_DeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	pIoStackIrp = IoGetCurrentIrpStackLocation(Irp);
 	switch(pIoStackIrp->Parameters.DeviceIoControl.IoControlCode)
 	{
-		case IOCTL_PID:
-			#ifdef DEBUG
-			DbgPrint("IOCTL_PID received : %s!\n", Irp->AssociatedIrp.SystemBuffer);
-			#endif DEBUG
-							
+		case IOCTL_PID:		
 			// parse the pids received from cuckoo
 			status = parse_pids(Irp->AssociatedIrp.SystemBuffer);
 		
 			Irp->IoStatus.Status = status;
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);
-			
 			if(NT_SUCCESS(status))
 			{
 				status = IoDeleteSymbolicLink(&usDosDeviceName);
-				#ifdef DEBUG
-				if(!NT_SUCCESS(status))
-					DbgPrint("IoDeleteSymbolicLink error.\n");
-				#endif DEBUG
-
 				IoDeleteDevice(DeviceObject);
 			}
 			
