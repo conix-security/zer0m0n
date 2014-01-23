@@ -16,6 +16,21 @@ For each activity traced by the driver (through the SSDT / callbacks) a log is p
 
 Code injections techniques are monitored by the driver: if a monitored process performs a known code-injection technique into another process, this process will be added to the monitored processes list.
 
+DISCLAIMER
+==========
+
+As you must have seen (especially if you looked at the code), we're not really "production" driver developpers :]. This is an alpha release, and there are still several bugs. We're actually tracking and correcting them, and as soon as a critical bug (vuln or BSOD) is corrected, a Master commit is performed.
+
+Thus, if you find:
+- bugs
+- bypassing techniques
+- vulnerabilities
+- new functions to monitor (or parameters)
+- generic remarks about driver development
+- beer
+
+Please just let us know !!! :]
+
 INSTALL/USE
 ===========
 
@@ -94,19 +109,6 @@ Here is a list of such improvements to come :
 *: there are plenty of ways to detect cuckoo or a virtual machine, our thought is to handle known (and used) techniques, and to build
    post-analysis signatures to detect generic detection techniques and warn the user about possible detection/bypass.
 
-
-DISCLAIMER
-==========
-
-As you must have seen (especially if you looked at the code), we're not really "production" driver developpers :]. Thus, if you find:
-- bugs
-- bypassing techniques (or just easy-to-use detecting techniques)
-- vulnerabilities (there must be some)
-- new functions to monitor (or parameters)
-- generic remarks about driver development
-- beer
-
-Please just let us know !!! :]
 
 Authors
 =======
