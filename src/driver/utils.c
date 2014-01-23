@@ -47,7 +47,7 @@ ULONG getTIDByHandle(HANDLE hThread)
 {
 	THREAD_BASIC_INFORMATION teb;
 	
-	if(ZwQueryInformationThread && hThread)
+	if(hThread)
 		if(NT_SUCCESS(ZwQueryInformationThread(hThread, 0, &teb, sizeof(teb), NULL)))
 			return (ULONG)teb.ClientId.UniqueThread;
 	
@@ -68,7 +68,7 @@ ULONG getPIDByHandle(HANDLE hProc)
 {
 	PROCESS_BASIC_INFORMATION peb;
 	
-	if(ZwQueryInformationProcess && hProc)
+	if(hProc)
 		if(NT_SUCCESS(ZwQueryInformationProcess(hProc, 0, &peb, sizeof(PROCESS_BASIC_INFORMATION), NULL)))
 			return peb.UniqueProcessId;
 	
@@ -103,17 +103,12 @@ NTSTATUS getProcNameByPID(ULONG pid, PUNICODE_STRING procName)
 	status = PsLookupProcessByProcessId((HANDLE)pid, &eProcess);
 	if(!NT_SUCCESS(status))
 		return status;
-
 	
 	status = ObOpenObjectByPointer(eProcess,0, NULL, 0,0,KernelMode,&hProcess);
-	if(!NT_SUCCESS(status) || !hProcess)
+	if(!NT_SUCCESS(status))
 		return status;
 	
 	ObDereferenceObject(eProcess);
-	
-	if(!ZwQueryInformationProcess)
-		return STATUS_ILLEGAL_ELEMENT_ADDRESS;
-	
 	ZwQueryInformationProcess(hProcess, ProcessImageFileName, NULL, 0, &returnedLength);
 	
 	buffer = ExAllocatePoolWithTag(PagedPool, returnedLength, BUF_POOL_TAG);

@@ -80,11 +80,18 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	PDEVICE_OBJECT pDeviceObject;
 	UNICODE_STRING usDriverName;
 	UNICODE_STRING filterPortName;
+	UNICODE_STRING function;
 	OBJECT_ATTRIBUTES objAttr;
 	PSECURITY_DESCRIPTOR securityDescriptor;
 	NTSTATUS status;
 	ULONG i;
 	 
+	// import some functions we will need
+	RtlInitUnicodeString(&function, L"ZwQueryInformationThread");
+	ZwQueryInformationThread = MmGetSystemRoutineAddress(&function);
+	RtlInitUnicodeString(&function, L"ZwQueryInformationProcess");
+	ZwQueryInformationProcess = MmGetSystemRoutineAddress(&function);
+	
 	RtlInitUnicodeString(&usDriverName, L"\\Device\\DriverSSDT");
 	RtlInitUnicodeString(&usDosDeviceName, L"\\DosDevices\\DriverSSDT"); 
 	status = IoCreateDevice(pDriverObject, 0, &usDriverName, FILE_DEVICE_UNKNOWN, 0, FALSE, &pDeviceObject);

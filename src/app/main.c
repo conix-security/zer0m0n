@@ -63,12 +63,13 @@ int main(int argc, char **argv)
 	int error_len = sizeof(error);
 	PUNICODE_STRING us_pathfile = NULL;
 	PWCHAR pw_pathfile = NULL;
-	
+
 	log.funcname = NULL;
 	log.procname = NULL;
 	log.fmt = NULL;
 	log.arguments = NULL;
 	
+
 	RtlInitUnicodeString = (RTLINITUNICODESTRING)GetProcAddress(LoadLibrary("ntdll.dll"), "RtlInitUnicodeString");
 	if(RtlInitUnicodeString == NULL)
 		return -1;
