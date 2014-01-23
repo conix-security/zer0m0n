@@ -54,23 +54,56 @@ VOID unhook_ssdt_entries()
 	if(oldZwCreateThread != NULL)
 		(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX) = oldZwCreateThread;
 	
-	(ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_INDEX) = oldZwMapViewOfSection;
-	(ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_INDEX) = oldZwSetContextThread;
-	(ZWQUEUEAPCTHREAD)SYSTEMSERVICE(QUEUEAPCTHREAD_INDEX) = oldZwQueueApcThread;
-	(ZWSYSTEMDEBUGCONTROL)SYSTEMSERVICE(SYSTEMDEBUGCONTROL_INDEX) = oldZwSystemDebugControl;
-	(ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_INDEX) = oldZwCreateProcess;
-	(ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_INDEX) = oldZwCreateProcessEx;
-	(ZWWRITEVIRTUALMEMORY)SYSTEMSERVICE(WRITEVIRTUALMEMORY_INDEX) = oldZwWriteVirtualMemory;
-	(ZWDEBUGACTIVEPROCESS)SYSTEMSERVICE(DEBUGACTIVEPROCESS_INDEX) = oldZwDebugActiveProcess;
-	(ZWOPENPROCESS)SYSTEMSERVICE(OPENPROCESS_INDEX) = oldZwOpenProcess;
-	(ZWOPENTHREAD)SYSTEMSERVICE(OPENTHREAD_INDEX) = oldZwOpenThread;
-	(ZWQUERYSYSTEMINFORMATION)SYSTEMSERVICE(QUERYSYSTEMINFORMATION_INDEX) = oldZwQuerySystemInformation;
-	(ZWCREATEFILE)SYSTEMSERVICE(CREATEFILE_INDEX) = oldZwCreateFile;
-	(ZWREADFILE)SYSTEMSERVICE(READFILE_INDEX) = oldZwReadFile;
-	(ZWWRITEFILE)SYSTEMSERVICE(WRITEFILE_INDEX) = oldZwWriteFile;
-	(ZWDELETEFILE)SYSTEMSERVICE(DELETEFILE_INDEX) = oldZwDeleteFile;
-	(ZWSETINFORMATIONFILE)SYSTEMSERVICE(SETINFORMATIONFILE_INDEX) = oldZwSetInformationFile;
-	(ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_INDEX) = oldZwQueryInformationFile;
+	if(oldZwMapViewOfSection != NULL)
+		(ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_INDEX) = oldZwMapViewOfSection;
+	
+	if(oldZwSetContextThread != NULL)
+		(ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_INDEX) = oldZwSetContextThread;
+	
+	if(oldZwQueueApcThread != NULL)
+		(ZWQUEUEAPCTHREAD)SYSTEMSERVICE(QUEUEAPCTHREAD_INDEX) = oldZwQueueApcThread;
+	
+	if(oldZwSystemDebugControl != NULL)
+		(ZWSYSTEMDEBUGCONTROL)SYSTEMSERVICE(SYSTEMDEBUGCONTROL_INDEX) = oldZwSystemDebugControl;
+	
+	if(oldZwCreateProcess != NULL)
+		(ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_INDEX) = oldZwCreateProcess;
+	
+	if(oldZwCreateProcessEx != NULL)
+		(ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_INDEX) = oldZwCreateProcessEx;
+	
+	if(oldZwWriteVirtualMemory != NULL)
+		(ZWWRITEVIRTUALMEMORY)SYSTEMSERVICE(WRITEVIRTUALMEMORY_INDEX) = oldZwWriteVirtualMemory;
+	
+	if(oldZwDebugActiveProcess != NULL)
+		(ZWDEBUGACTIVEPROCESS)SYSTEMSERVICE(DEBUGACTIVEPROCESS_INDEX) = oldZwDebugActiveProcess;
+	
+	if(oldZwOpenProcess != NULL)
+		(ZWOPENPROCESS)SYSTEMSERVICE(OPENPROCESS_INDEX) = oldZwOpenProcess;
+	
+	if(oldZwOpenThread != NULL)
+		(ZWOPENTHREAD)SYSTEMSERVICE(OPENTHREAD_INDEX) = oldZwOpenThread;
+	
+	if(oldZwQuerySystemInformation != NULL)
+		(ZWQUERYSYSTEMINFORMATION)SYSTEMSERVICE(QUERYSYSTEMINFORMATION_INDEX) = oldZwQuerySystemInformation;
+	
+	if(oldZwCreateFile != NULL)
+		(ZWCREATEFILE)SYSTEMSERVICE(CREATEFILE_INDEX) = oldZwCreateFile;
+	
+	if(oldZwReadFile != NULL)
+		(ZWREADFILE)SYSTEMSERVICE(READFILE_INDEX) = oldZwReadFile;
+	
+	if(oldZwWriteFile != NULL)
+		(ZWWRITEFILE)SYSTEMSERVICE(WRITEFILE_INDEX) = oldZwWriteFile;
+	
+	if(oldZwDeleteFile != NULL)
+		(ZWDELETEFILE)SYSTEMSERVICE(DELETEFILE_INDEX) = oldZwDeleteFile;
+	
+	if(oldZwSetInformationFile != NULL)
+		(ZWSETINFORMATIONFILE)SYSTEMSERVICE(SETINFORMATIONFILE_INDEX) = oldZwSetInformationFile;
+	
+	if(oldZwQueryInformationFile != NULL)
+		(ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_INDEX) = oldZwQueryInformationFile;
 
 	enable_cr0();
 }
@@ -156,7 +189,7 @@ VOID hook_ssdt_entries()
 //	Return value :
 //		See http://msdn.microsoft.com/en-us/library/bb432382(v=vs.85).aspx
 //	Process :
-//		Calls the original function and if it succeeds, gets the TID by handle. If the PID is hidden
+//		Calls the original function and if it succeeds, gets the targetThreadId by handle. If the targetProcessId is hidden
 //		closes the handle and returns STATUS_INVALID_PARAMETER.
 //		It the call failed, if ClientID is not NULL, copies the ClientID->UniqueThread parameter and
 //		logs it. If ClientID is NULL (XP / s2003), copies the ObjectAttributes->ObjectName parameter
@@ -166,17 +199,21 @@ VOID hook_ssdt_entries()
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientID)
 {
-	NTSTATUS statusCall, errorCode;
-	ULONG currentProc, tid, pid, kUniqueThread;
-	UNICODE_STRING kObjectName;
-	HANDLE kThreadHandle;
-	PWCHAR parameter = NULL;
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, targetThreadId, targetProcessId;
 	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
 	PETHREAD eThread = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	ULONG kUniqueThread;
+	HANDLE kThreadHandle;
+	UNICODE_STRING kObjectName;
+
+	kObjectName.Buffer = NULL;
+	
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWOPENTHREAD)(oldZwOpenThread))(ThreadHandle, DesiredAccess, ObjectAttributes, ClientID);
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
@@ -187,42 +224,41 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 				if(ExGetPreviousMode() != KernelMode)
 					ProbeForRead(ThreadHandle, sizeof(HANDLE), 1);
 				kThreadHandle = *ThreadHandle;
-			} 
+			}
 			__except (EXCEPTION_EXECUTE_HANDLER)
 			{
-				errorCode = GetExceptionCode();
-				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1",errorCode)))
-					sendLogs(currentProc, L"ZwOpenThread", parameter);
+				exceptionCode = GetExceptionCode();
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1",exceptionCode)))
+					sendLogs(currentProcessId, L"ZwOpenThread", parameter);
 				else
-					sendLogs(currentProc, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->-1,TID->-1,DesiredAccess->1");
+					sendLogs(currentProcessId, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->-1,TID->-1,DesiredAccess->1");
 				ExFreePool(parameter);
-				return errorCode;
+				return exceptionCode;
 			}
 		
-			tid = getTIDByHandle(kThreadHandle);
-			if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)tid, &eThread)))
-				pid = *(DWORD*)((PCHAR)eThread+0x1EC);
+			targetThreadId = getTIDByHandle(kThreadHandle);
+			if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)targetThreadId, &eThread)))
+				targetProcessId = *(DWORD*)((PCHAR)eThread+0x1EC);
 			else
-				pid = -1;
+				targetProcessId = 0;
 			
-			if(isProcessHiddenByPid(pid))
+			if(isProcessHiddenByPid(targetProcessId))
 			{
 				ZwClose(kThreadHandle);
-				if(parameter && RtlStringCchPrintfW(parameter, MAXSIZE, L"0,3221225485,sss,ThreadHandle->-1,TID->%d,DesiredAccess->0x%08x", tid, DesiredAccess))
-					sendLogs(currentProc, L"ZwOpenThread", parameter);
+				if(parameter && RtlStringCchPrintfW(parameter, MAXSIZE, L"0,3221225485,sss,ThreadHandle->-1,TID->%d,DesiredAccess->0x%08x", targetThreadId, DesiredAccess))
+					sendLogs(currentProcessId, L"ZwOpenThread", parameter);
 				else
-					sendLogs(currentProc, L"ZwOpenThread", L"0,3221225485,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1");
+					sendLogs(currentProcessId, L"ZwOpenThread", L"0,3221225485,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1");
 				return STATUS_INVALID_PARAMETER;
 			}
 			
 			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sss,ThreadHandle->0x%08x,TID->%d,DesiredAccess->0x%08x", kThreadHandle, tid, DesiredAccess)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sss,ThreadHandle->0x%08x,TID->%d,DesiredAccess->0x%08x", kThreadHandle, targetThreadId, DesiredAccess)))
 				log_lvl = LOG_PARAM;
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			// recup le tid
 			if(ClientID != NULL)
 			{
 				__try 
@@ -233,11 +269,11 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 				} 
 				__except (EXCEPTION_EXECUTE_HANDLER)
 				{
-					errorCode = GetExceptionCode();
-					if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1", errorCode)))
-						sendLogs(currentProc, L"ZwOpenThread", parameter);
+					exceptionCode = GetExceptionCode();
+					if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1", exceptionCode)))
+						sendLogs(currentProcessId, L"ZwOpenThread", parameter);
 					else 
-						sendLogs(currentProc, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1");
+						sendLogs(currentProcessId, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1");
 					if(parameter)
 						ExFreePool(parameter);
 					return statusCall;
@@ -258,23 +294,22 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 					kObjectName.Length = ObjectAttributes->ObjectName->Length;
 					kObjectName.MaximumLength = ObjectAttributes->ObjectName->Length;
 					kObjectName.Buffer = ExAllocatePoolWithTag(NonPagedPool, kObjectName.MaximumLength, BUFFER_TAG);
-					if(kObjectName.Buffer)
-						RtlCopyUnicodeString(&kObjectName, ObjectAttributes->ObjectName);
-					else
+					if(!kObjectName.Buffer)
 					{
 						if(parameter)
 							ExFreePool(parameter);
-						sendLogs(currentProc, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1");
+						sendLogs(currentProcessId, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1");
 						return statusCall;
 					}
+					RtlCopyUnicodeString(&kObjectName, ObjectAttributes->ObjectName);
 				}
 				__except (EXCEPTION_EXECUTE_HANDLER)
 				{
-					errorCode = GetExceptionCode();
-					if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1", errorCode)))
-						sendLogs(currentProc, L"ZwOpenThread", parameter);
+					exceptionCode = GetExceptionCode();
+					if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1", exceptionCode)))
+						sendLogs(currentProcessId, L"ZwOpenThread", parameter);
 					else 
-						sendLogs(currentProc, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1");
+						sendLogs(currentProcessId, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->-1,TID->-1,DesiredAccess->-1");
 					if(parameter)
 						ExFreePool(parameter);
 					if(kObjectName.Buffer)
@@ -291,13 +326,13 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwOpenThread", parameter);
+				sendLogs(currentProcessId, L"ZwOpenThread", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->ERROR,TID->ERROR,DesiredAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->ERROR,TID->ERROR,DesiredAccess->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwOpenThread", L"1,0,sss,ThreadHandle->ERROR,TID->ERROR,DesiredAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwOpenThread", L"1,0,sss,ThreadHandle->ERROR,TID->ERROR,DesiredAccess->ERROR");
 			break;
 		}
 		if(parameter != NULL)
@@ -317,7 +352,7 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 //	Return value :
 //		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567022(v=vs.85).aspx
 //	Process :
-//		Calls the original function and if it succeeds, gets the PID by handle. If the PID is hidden
+//		Calls the original function and if it succeeds, gets the targetProcessId by handle. If the targetProcessId is hidden
 //		closes the handle and returns STATUS_INVALID_PARAMETER.
 //		It the call failed, if ClientID is not NULL, copies the ClientID->UniqueThread parameter and
 //		logs it. If ClientID is NULL (XP / s2003), copies the ObjectAttributes->ObjectName parameter
@@ -327,21 +362,27 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientID)
 {	
-	NTSTATUS statusCall, status, errorCode;
-	ULONG currentProc, kUniqueProcess, i, pid;
-	UNICODE_STRING kObjectName, remoteProc;
-	HANDLE kRootDirectory, kProcessHandle;
-	PWCHAR parameter = NULL;
+	NTSTATUS statusCall, status, exceptionCode;
+	ULONG currentProcessId, i, targetProcessId;
 	USHORT log_lvl = LOG_ERROR;
+	UNICODE_STRING targetProcessName;
+	PWCHAR parameter = NULL;
+	
+	HANDLE kRootDirectory, kProcessHandle;
+	UNICODE_STRING kObjectName;
+	ULONG kUniqueProcess;
+	
+	kObjectName.Buffer = NULL;
+	targetProcessName.Buffer = NULL;
 
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
 	statusCall = ((ZWOPENPROCESS)(oldZwOpenProcess))(ProcessHandle, DesiredAccess, ObjectAttributes, ClientID);
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{   	
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
-		remoteProc.Length = 0;
-		remoteProc.MaximumLength = NTSTRSAFE_UNICODE_STRING_MAX_CCH * sizeof(WCHAR);
-		remoteProc.Buffer = ExAllocatePoolWithTag(NonPagedPool, remoteProc.MaximumLength, PROCNAME_TAG);
+		targetProcessName.Length = 0;
+		targetProcessName.MaximumLength = NTSTRSAFE_UNICODE_STRING_MAX_CCH * sizeof(WCHAR);
+		targetProcessName.Buffer = ExAllocatePoolWithTag(NonPagedPool, targetProcessName.MaximumLength, PROCNAME_TAG);
 		
 		if(NT_SUCCESS(statusCall))
 		{
@@ -353,37 +394,37 @@ NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 			} 
 			__except (EXCEPTION_EXECUTE_HANDLER)
 			{
-				errorCode = GetExceptionCode();
-				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1",errorCode)))
-					sendLogs(currentProc, L"ZwOpenProcess", parameter);
+				exceptionCode = GetExceptionCode();
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1",exceptionCode)))
+					sendLogs(currentProcessId, L"ZwOpenProcess", parameter);
 				else
-					sendLogs(currentProc, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->1");
+					sendLogs(currentProcessId, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->1");
 				ExFreePool(parameter);
-				return errorCode;
+				return exceptionCode;
 			}
 		
-			pid = getPIDByHandle(kProcessHandle);
-			if(remoteProc.Buffer)
-				status = getProcNameByPID(pid, &remoteProc);
+			targetProcessId = getPIDByHandle(kProcessHandle);
+			if(targetProcessName.Buffer)
+				status = getProcNameByPID(targetProcessId, &targetProcessName);
 			else
-				status = -1;
+				status = STATUS_NOT_FOUND;
 				
-			if(isProcessHiddenByPid(pid))
+			if(isProcessHiddenByPid(targetProcessId))
 			{
 				ZwClose(kProcessHandle);
-				if(parameter && NT_SUCCESS(status) && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,-1,ssss,ProcessHandle->0x%08x,ProcessName->%wZ,PID->%d,DesiredAccess->0x%08x", kProcessHandle, &remoteProc, pid, DesiredAccess)))
-					sendLogs(currentProc, L"ZwOpenProcess", parameter);
+				if(parameter && NT_SUCCESS(status) && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,-1,ssss,ProcessHandle->0x%08x,ProcessName->%wZ,PID->%d,DesiredAccess->0x%08x", kProcessHandle, &targetProcessName, targetProcessId, DesiredAccess)))
+					sendLogs(currentProcessId, L"ZwOpenProcess", parameter);
 				else
-					sendLogs(currentProc, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->-1,ProcessName->Error_HIDDEN,PID->-1,DesiredAccess->-1");
+					sendLogs(currentProcessId, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->-1,ProcessName->Error_HIDDEN,PID->-1,DesiredAccess->-1");
 				
-				if(remoteProc.Buffer)
-					ExFreePool(remoteProc.Buffer);
+				if(targetProcessName.Buffer)
+					ExFreePool(targetProcessName.Buffer);
 				if(parameter)
 					ExFreePool(parameter);
 				return STATUS_INVALID_PARAMETER;
 			}
 			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(status) && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssss,ProcessHandle->0x%08x,ProcessName->%wZ,PID->%d,DesiredAccess->0x%08x", kProcessHandle, &remoteProc, pid, DesiredAccess)))
+			if(parameter && NT_SUCCESS(status) && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssss,ProcessHandle->0x%08x,ProcessName->%wZ,PID->%d,DesiredAccess->0x%08x", kProcessHandle, &targetProcessName, targetProcessId, DesiredAccess)))
 				log_lvl = LOG_PARAM;
 		}
 		else
@@ -399,24 +440,24 @@ NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 				}
 				__except (EXCEPTION_EXECUTE_HANDLER)
 				{
-					errorCode = GetExceptionCode();
-					if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1", errorCode)))
-						sendLogs(currentProc, L"ZwOpenProcess", parameter);
+					exceptionCode = GetExceptionCode();
+					if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1", exceptionCode)))
+						sendLogs(currentProcessId, L"ZwOpenProcess", parameter);
 					else 
-						sendLogs(currentProc, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1");
+						sendLogs(currentProcessId, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1");
 					if(parameter)
 						ExFreePool(parameter);
-					if(remoteProc.Buffer)
-						ExFreePool(remoteProc.Buffer);
+					if(targetProcessName.Buffer)
+						ExFreePool(targetProcessName.Buffer);
 					return statusCall;
 				}
 				
-				if(remoteProc.Buffer)
-					status = getProcNameByPID(kUniqueProcess, &remoteProc);
+				if(targetProcessName.Buffer)
+					status = getProcNameByPID(kUniqueProcess, &targetProcessName);
 				else
-					status = -1;
+					status = STATUS_NOT_FOUND;
 				
-				if(parameter && NT_SUCCESS(status) && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ProcessHandle->-1,ProcessName->%wZ,PID->%d,DesiredAccess->0x%08x", statusCall,&remoteProc, kUniqueProcess, DesiredAccess)))
+				if(parameter && NT_SUCCESS(status) && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ProcessHandle->-1,ProcessName->%wZ,PID->%d,DesiredAccess->0x%08x", statusCall,&targetProcessName, kUniqueProcess, DesiredAccess)))
 					log_lvl = LOG_PARAM;
 			}
 			else
@@ -438,23 +479,23 @@ NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 					{
 						if(parameter)
 							ExFreePool(parameter);
-						if(remoteProc.Buffer)
-							ExFreePool(remoteProc.Buffer);
-						sendLogs(currentProc, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1");
+						if(targetProcessName.Buffer)
+							ExFreePool(targetProcessName.Buffer);
+						sendLogs(currentProcessId, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1");
 						return statusCall;
 					}
 				}
 				__except (EXCEPTION_EXECUTE_HANDLER)
 				{
-					errorCode = GetExceptionCode();
-					if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1", errorCode)))
-						sendLogs(currentProc, L"ZwOpenProcess", parameter);
+					exceptionCode = GetExceptionCode();
+					if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1", exceptionCode)))
+						sendLogs(currentProcessId, L"ZwOpenProcess", parameter);
 					else 
-						sendLogs(currentProc, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1");
+						sendLogs(currentProcessId, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->-1,ProcessName->-1,PID->-1,DesiredAccess->-1");
 					if(parameter)
 						ExFreePool(parameter);
-					if(remoteProc.Buffer)
-						ExFreePool(remoteProc.Buffer);
+					if(targetProcessName.Buffer)
+						ExFreePool(targetProcessName.Buffer);
 					if(kObjectName.Buffer)
 						ExFreePool(kObjectName.Buffer);
 					return statusCall;
@@ -470,19 +511,19 @@ NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwOpenProcess", parameter);
+				sendLogs(currentProcessId, L"ZwOpenProcess", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->ERROR,ProcessName->ERROR,PID->ERROR,DesiredAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwOpenProcess", L"0,-1,ssss,ProcessHandle->ERROR,ProcessName->ERROR,PID->ERROR,DesiredAccess->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwOpenProcess", L"1,0,ssss,ProcessHandle->ERROR,ProcessName->ERROR,PID->ERROR,DesiredAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwOpenProcess", L"1,0,ssss,ProcessHandle->ERROR,ProcessName->ERROR,PID->ERROR,DesiredAccess->ERROR");
 			break;
 		}
 		if(parameter != NULL)
 			ExFreePool(parameter);
-		if(remoteProc.Buffer)
-			ExFreePool(remoteProc.Buffer);
+		if(targetProcessName.Buffer)
+			ExFreePool(targetProcessName.Buffer);
 	}
 	return statusCall;
 }
@@ -496,22 +537,22 @@ NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 //		See http://msdn.microsoft.com/en-us/library/windows/desktop/ms725506(v=vs.85).aspx
 //	Process :
 //		Checks the information type. If SystemProcessInformation (enumerate running processes), the
-//		hidden PIDs are unlinked from the result (SYSTEM_PROCESS_INFORMATION linked list).
+//		hidden targetProcessIds are unlinked from the result (SYSTEM_PROCESS_INFORMATION linked list).
 //	Todo :
 //		- Hide also thread listing
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength)
 {
 	NTSTATUS statusCall;
-	ULONG currentProc, tid, i;
+	ULONG currentProcessId, targetThreadId, i;
+	USHORT log_lvl = LOG_ERROR;
 	PSYSTEM_PROCESS_INFORMATION pSystemProcessInformation = NULL, pPrev = NULL;
 	PWCHAR parameter = NULL;
-	USHORT log_lvl = LOG_ERROR;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	
 	statusCall = ((ZWQUERYSYSTEMINFORMATION)(oldZwQuerySystemInformation))(SystemInformationClass, SystemInformation, SystemInformationLength, ReturnLength);
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		if(NT_SUCCESS(statusCall))
 		{
@@ -529,7 +570,7 @@ NTSTATUS newZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationC
 					pSystemProcessInformation = (PSYSTEM_PROCESS_INFORMATION)((char*)pSystemProcessInformation + pSystemProcessInformation->NextEntryOffset);
 				}
 				
-				sendLogs(currentProc, L"ZwQuerySystemInformation",L"1,0,s,SystemInformationClass->5");
+				sendLogs(currentProcessId, L"ZwQuerySystemInformation",L"1,0,s,SystemInformationClass->5");
 				return statusCall;
 			}
 			else
@@ -551,13 +592,13 @@ NTSTATUS newZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationC
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwQuerySystemInformation", parameter);
+				sendLogs(currentProcessId, L"ZwQuerySystemInformation", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwQuerySystemInformation", L"0,-1,s,SystemInformationClass->ERROR");
+				sendLogs(currentProcessId, L"ZwQuerySystemInformation", L"0,-1,s,SystemInformationClass->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwQuerySystemInformation", L"1,0,s,SystemInformationClass->ERROR");
+				sendLogs(currentProcessId, L"ZwQuerySystemInformation", L"1,0,s,SystemInformationClass->ERROR");
 			break;
 		}
 		if(parameter != NULL)
@@ -580,44 +621,44 @@ NTSTATUS newZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationC
 NTSTATUS newZwWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToWrite, PULONG NumberOfBytesWritten)
 {
 	NTSTATUS statusCall;
-	ULONG currentProc, remotePid;
-	PWCHAR parameter = NULL;
+	ULONG currentProcessId, targetProcessId;
 	ULONG log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWWRITEVIRTUALMEMORY)(oldZwWriteVirtualMemory))(ProcessHandle, BaseAddress, Buffer, NumberOfBytesToWrite, NumberOfBytesWritten);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
-		remotePid = getPIDByHandle(ProcessHandle);
+		targetProcessId = getPIDByHandle(ProcessHandle);
 		
-		if(NT_SUCCESS(statusCall) && remotePid)
-			startMonitoringProcess(remotePid);
+		if(NT_SUCCESS(statusCall) && targetProcessId)
+			startMonitoringProcess(targetProcessId);
 		
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,Buffer->0x%08x,NumberOfBytesToWrite->%d", ProcessHandle, remotePid, BaseAddress, Buffer, NumberOfBytesToWrite)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,Buffer->0x%08x,NumberOfBytesToWrite->%d", ProcessHandle, targetProcessId, BaseAddress, Buffer, NumberOfBytesToWrite)))
 				log_lvl = LOG_PARAM;
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,Buffer->0x%08x,NumberOfBytesToWrite->%d", statusCall, ProcessHandle, remotePid, BaseAddress, Buffer, NumberOfBytesToWrite)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,Buffer->0x%08x,NumberOfBytesToWrite->%d", statusCall, ProcessHandle, targetProcessId, BaseAddress, Buffer, NumberOfBytesToWrite)))
 				log_lvl = LOG_PARAM;
 		}
 		
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwWriteVirtualMemory", parameter);
+				sendLogs(currentProcessId, L"ZwWriteVirtualMemory", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwWriteVirtualMemory", L"0,1,sssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,Buffer->ERROR,NumberOfBytesToWrite->ERROR");
+				sendLogs(currentProcessId, L"ZwWriteVirtualMemory", L"0,1,sssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,Buffer->ERROR,NumberOfBytesToWrite->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwWriteVirtualMemory", L"1,0,sssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,Buffer->ERROR,NumberOfBytesToWrite->ERROR");
+				sendLogs(currentProcessId, L"ZwWriteVirtualMemory", L"1,0,sssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,Buffer->ERROR,NumberOfBytesToWrite->ERROR");
 			break;
 		}
 		if(parameter != NULL)
@@ -635,48 +676,48 @@ NTSTATUS newZwWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID 
 //	Return value :
 //		See http://www.openrce.org/articles/full_view/26
 //	Process :
-//		Adds the process to the monitored processes list and logs the PID, ProcessHandle and DebugHandle parameters
+//		Adds the process to the monitored processes list and logs the targetProcessId, ProcessHandle and DebugHandle parameters
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwDebugActiveProcess(HANDLE ProcessHandle, HANDLE DebugHandle)
 {
 	NTSTATUS statusCall;
-	ULONG remotePid, currentProc;
-	PWCHAR parameter = NULL;
+	ULONG targetProcessId, currentProcessId;
 	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWDEBUGACTIVEPROCESS)(oldZwDebugActiveProcess))(ProcessHandle, DebugHandle);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{		
-		remotePid = getPIDByHandle(ProcessHandle);
+		targetProcessId = getPIDByHandle(ProcessHandle);
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sss,ProcessHandle->0x%08x,PID->%d,DebugHandle->0x%08x", ProcessHandle, remotePid, DebugHandle)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sss,ProcessHandle->0x%08x,PID->%d,DebugHandle->0x%08x", ProcessHandle, targetProcessId, DebugHandle)))
 				log_lvl = LOG_PARAM;
-			if(remotePid)
-				startMonitoringProcess(remotePid);
+			if(targetProcessId)
+				startMonitoringProcess(targetProcessId);
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,ProcessHandle->0x%08x,PID->%d,DebugHandle->0x%08x", statusCall, ProcessHandle, remotePid, DebugHandle)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,ProcessHandle->0x%08x,PID->%d,DebugHandle->0x%08x", statusCall, ProcessHandle, targetProcessId, DebugHandle)))
 				log_lvl = LOG_PARAM;
 		}
 		
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwDebugActiveProcess", parameter);
+				sendLogs(currentProcessId, L"ZwDebugActiveProcess", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwDebugActiveProcess", L"0,-1,sss,ProcessHandle->ERROR,PID->ERROR,DebugHandle->ERROR");
+				sendLogs(currentProcessId, L"ZwDebugActiveProcess", L"0,-1,sss,ProcessHandle->ERROR,PID->ERROR,DebugHandle->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwDebugActiveProcess", L"1,0,sss,ProcessHandle->ERROR,PID->ERROR,DebugHandle->ERROR");
+				sendLogs(currentProcessId, L"ZwDebugActiveProcess", L"1,0,sss,ProcessHandle->ERROR,PID->ERROR,DebugHandle->ERROR");
 			break;
 		}
 		if(parameter != NULL)
@@ -693,7 +734,7 @@ NTSTATUS newZwDebugActiveProcess(HANDLE ProcessHandle, HANDLE DebugHandle)
 //	Return value :
 //		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Process/NtCreateProcess.html
 //	Process :
-//		Starts the process, gets its PID and adds it to the monitored processes list, copies
+//		Starts the process, gets its targetProcessId and adds it to the monitored processes list, copies
 //		ObjectAttributes->ObjectName parameter then logs.
 //	TODO : 
 //		- also log ProcessHandle, DesiredAccess, InheritObjectTable, ParentProcess
@@ -701,20 +742,23 @@ NTSTATUS newZwDebugActiveProcess(HANDLE ProcessHandle, HANDLE DebugHandle)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwCreateProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ParentProcess, BOOLEAN InheritObjectTable, HANDLE SectionHandle, HANDLE DebugPort, HANDLE ExceptionPort)
 {
-	NTSTATUS statusCall, errorCode;
-	ULONG currentProc, child_pid;
-	PWCHAR parameter = NULL;
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, childProcessId;
 	USHORT log_lvl = LOG_ERROR;
+	UNICODE_STRING full_path;
+	POBJECT_NAME_INFORMATION nameInformation = NULL;
+	PWCHAR parameter = NULL;
+
 	HANDLE kRootDirectory, kProcessHandle;
-	UNICODE_STRING full_path, kObjectName;
-	POBJECT_NAME_INFORMATION nameInfo = NULL;
+	UNICODE_STRING kObjectName;
+	
 	full_path.Buffer = NULL;
 	kObjectName.Buffer = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWCREATEPROCESS)(oldZwCreateProcess))(ProcessHandle, DesiredAccess, ObjectAttributes, ParentProcess, InheritObjectTable, SectionHandle, DebugPort, ExceptionPort);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		kObjectName.Buffer = NULL;
@@ -732,7 +776,7 @@ NTSTATUS newZwCreateProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, PO
 				}
 			}	
 			kProcessHandle = *ProcessHandle;
-			child_pid = getPIDByHandle(kProcessHandle);
+			childProcessId = getPIDByHandle(kProcessHandle);
 			if(ObjectAttributes)
 			{
 				kRootDirectory = ObjectAttributes->RootDirectory;
@@ -744,29 +788,29 @@ NTSTATUS newZwCreateProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, PO
 		}
 		__except (EXCEPTION_EXECUTE_HANDLER)
 		{
-			errorCode = GetExceptionCode();
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritObjectTable->-1,ParentProcess->-1,FileName->-1", errorCode)))
-				sendLogs(currentProc, L"ZwCreateProcess", parameter);
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritObjectTable->-1,ParentProcess->-1,FileName->-1", exceptionCode)))
+				sendLogs(currentProcessId, L"ZwCreateProcess", parameter);
 			else 
-				sendLogs(currentProc, L"ZwCreateProcess", L"0,-1,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritObjectTable->-1,ParentProcess->-1,FileName->-1");
+				sendLogs(currentProcessId, L"ZwCreateProcess", L"0,-1,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritObjectTable->-1,ParentProcess->-1,FileName->-1");
 			ExFreePool(parameter);
 			if(kObjectName.Buffer)
 				ExFreePool(kObjectName.Buffer);
-			return errorCode;
+			return exceptionCode;
 		}
 		
 		if(kRootDirectory && ObjectAttributes)	// handle the not null rootdirectory case
 		{
 			// allocate both name information struct and unicode string buffer
-			nameInfo = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-			if(nameInfo)
+			nameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+			if(nameInformation)
 			{
-				if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, nameInfo, MAXSIZE, NULL)))
+				if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, nameInformation, MAXSIZE, NULL)))
 				{
-					full_path.MaximumLength = nameInfo->Name.Length + kObjectName.Length + 2 + sizeof(WCHAR);
+					full_path.MaximumLength = nameInformation->Name.Length + kObjectName.Length + 2 + sizeof(WCHAR);
 					full_path.Buffer = ExAllocatePoolWithTag(NonPagedPool, full_path.MaximumLength, BUFFER_TAG);
 					RtlZeroMemory(full_path.Buffer, full_path.MaximumLength);
-					RtlCopyUnicodeString(&full_path, &(nameInfo->Name));
+					RtlCopyUnicodeString(&full_path, &(nameInformation->Name));
 					RtlAppendUnicodeToString(&full_path, L"\\");
 					RtlAppendUnicodeStringToString(&full_path, &kObjectName);
 				}
@@ -778,28 +822,28 @@ NTSTATUS newZwCreateProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, PO
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssssss,ProcessHandle->0x%08x,PID->%d,DesiredAccess->0x%08x,InheritObjectTable->%d,ParentProcess->0x%08x,FileName->%wZ", kProcessHandle,child_pid,DesiredAccess,InheritObjectTable,ParentProcess,&full_path)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssssss,ProcessHandle->0x%08x,PID->%d,DesiredAccess->0x%08x,InheritObjectTable->%d,ParentProcess->0x%08x,FileName->%wZ", kProcessHandle,childProcessId,DesiredAccess,InheritObjectTable,ParentProcess,&full_path)))
 				log_lvl = LOG_PARAM;
-			if(child_pid)
-				startMonitoringProcess(child_pid);
+			if(childProcessId)
+				startMonitoringProcess(childProcessId);
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssssss,ProcessHandle->0x%08x,PID->%d,DesiredAccess->0x%08x,InheritObjectTable->%d,ParentProcess->0x%08x,FileName->%wZ", statusCall,kProcessHandle,child_pid,DesiredAccess,InheritObjectTable,ParentProcess,&full_path)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssssss,ProcessHandle->0x%08x,PID->%d,DesiredAccess->0x%08x,InheritObjectTable->%d,ParentProcess->0x%08x,FileName->%wZ", statusCall,kProcessHandle,childProcessId,DesiredAccess,InheritObjectTable,ParentProcess,&full_path)))
 				log_lvl = LOG_PARAM;
 		}
 		
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwCreateProcess", parameter);
+				sendLogs(currentProcessId, L"ZwCreateProcess", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwCreateProcess", L"0,-1,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritObjectTable->-1,ParentProcess->-1,FileName->-1");
+				sendLogs(currentProcessId, L"ZwCreateProcess", L"0,-1,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritObjectTable->-1,ParentProcess->-1,FileName->-1");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwCreateProcess", L"1,0,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritObjectTable->-1,ParentProcess->-1,FileName->-1");
+				sendLogs(currentProcessId, L"ZwCreateProcess", L"1,0,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritObjectTable->-1,ParentProcess->-1,FileName->-1");
 			break;
 		}
 		if(parameter != NULL)
@@ -816,25 +860,28 @@ NTSTATUS newZwCreateProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, PO
 //	Return value :
 //		See http://www.tech-archive.net/Archive/Development/microsoft.public.win32.programmer.kernel/2004-02/0195.html (lulz)
 //	Process :
-//		Starts the process, gets its PID and adds it to the monitored processes list, copies
+//		Starts the process, gets its targetProcessId and adds it to the monitored processes list, copies
 //		ObjectAttributes->ObjectName parameter then logs.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE InheritFromProcessHandle, BOOLEAN InheritHandles, HANDLE SectionHandle, HANDLE DebugPort, HANDLE ExceptionPort, HANDLE dunno)
 {
-	NTSTATUS statusCall, errorCode;
-	ULONG currentProc, child_pid;
-	PWCHAR parameter = NULL;
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, childProcessId;
 	USHORT log_lvl = LOG_ERROR;
+	UNICODE_STRING full_path;
+	PWCHAR parameter = NULL;
+	POBJECT_NAME_INFORMATION nameInformation = NULL;
+	
 	HANDLE kRootDirectory, kProcessHandle;
-	UNICODE_STRING full_path, kObjectName;
-	POBJECT_NAME_INFORMATION nameInfo = NULL;
+	UNICODE_STRING kObjectName;
+	
 	full_path.Buffer = NULL;
 	kObjectName.Buffer = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWCREATEPROCESSEX)(oldZwCreateProcessEx))(ProcessHandle, DesiredAccess, ObjectAttributes, InheritFromProcessHandle, InheritHandles, SectionHandle, DebugPort, ExceptionPort, dunno);	 
 		
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		kObjectName.Buffer = NULL;
@@ -852,7 +899,7 @@ NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 				}
 			}
 			kProcessHandle = *ProcessHandle;
-			child_pid = getPIDByHandle(kProcessHandle);
+			childProcessId = getPIDByHandle(kProcessHandle);
 			if(ObjectAttributes)
 			{
 				kRootDirectory = ObjectAttributes->RootDirectory;
@@ -864,29 +911,29 @@ NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 		} 
 		__except (EXCEPTION_EXECUTE_HANDLER)
 		{
-			errorCode = GetExceptionCode();
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritHandles->-1,InheritFromProcessHandle->-1,FileName->-1", errorCode)))
-				sendLogs(currentProc, L"ZwCreateProcessEx", parameter);
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritHandles->-1,InheritFromProcessHandle->-1,FileName->-1", exceptionCode)))
+				sendLogs(currentProcessId, L"ZwCreateProcessEx", parameter);
 			else 
-				sendLogs(currentProc, L"ZwCreateProcessEx", L"0,-1,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritHandles->-1,InheritFromProcessHandle->-1,FileName->-1");
+				sendLogs(currentProcessId, L"ZwCreateProcessEx", L"0,-1,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritHandles->-1,InheritFromProcessHandle->-1,FileName->-1");
 			ExFreePool(parameter);
 			if(kObjectName.Buffer)
 				ExFreePool(kObjectName.Buffer);
-			return errorCode;
+			return exceptionCode;
 		}
 		
 		if(kRootDirectory && ObjectAttributes)	// handle the not null rootdirectory case
 		{
 			// allocate both name information struct and unicode string buffer
-			nameInfo = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-			if(nameInfo)
+			nameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+			if(nameInformation)
 			{
-				if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, nameInfo, MAXSIZE, NULL)))
+				if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, nameInformation, MAXSIZE, NULL)))
 				{
-					full_path.MaximumLength = nameInfo->Name.Length + kObjectName.Length + 2 + sizeof(WCHAR);
+					full_path.MaximumLength = nameInformation->Name.Length + kObjectName.Length + 2 + sizeof(WCHAR);
 					full_path.Buffer = ExAllocatePoolWithTag(NonPagedPool, full_path.MaximumLength, BUFFER_TAG);
 					RtlZeroMemory(full_path.Buffer, full_path.MaximumLength);
-					RtlCopyUnicodeString(&full_path, &(nameInfo->Name));
+					RtlCopyUnicodeString(&full_path, &(nameInformation->Name));
 					RtlAppendUnicodeToString(&full_path, L"\\");
 					RtlAppendUnicodeStringToString(&full_path, &kObjectName);
 				}
@@ -903,29 +950,29 @@ NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssssss,ProcessHandle->0x%08x,PID->%d,DesiredAccess->0x%08x,InheritHandles->%d,InheritFromProcessHandle->0x%08x,FileName->%wZ", kProcessHandle,child_pid,DesiredAccess,InheritHandles,InheritFromProcessHandle,&full_path)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssssss,ProcessHandle->0x%08x,PID->%d,DesiredAccess->0x%08x,InheritHandles->%d,InheritFromProcessHandle->0x%08x,FileName->%wZ", kProcessHandle,childProcessId,DesiredAccess,InheritHandles,InheritFromProcessHandle,&full_path)))
 				log_lvl = LOG_PARAM;
 			
-			if(child_pid)
-				startMonitoringProcess(child_pid);
+			if(childProcessId)
+				startMonitoringProcess(childProcessId);
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssssss,ProcessHandle->0x%08x,PID->%d,DesiredAccess->0x%08x,InheritObjectTable->%d,ParentProcess->0x%08x,FileName->%wZ", statusCall,kProcessHandle,child_pid,DesiredAccess,InheritHandles,InheritFromProcessHandle,&full_path)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssssss,ProcessHandle->0x%08x,PID->%d,DesiredAccess->0x%08x,InheritObjectTable->%d,ParentProcess->0x%08x,FileName->%wZ", statusCall,kProcessHandle,childProcessId,DesiredAccess,InheritHandles,InheritFromProcessHandle,&full_path)))
 				log_lvl = LOG_PARAM;
 		}
 		
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwCreateProcessEx", parameter);
+				sendLogs(currentProcessId, L"ZwCreateProcessEx", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwCreateProcessEx", L"0,-1,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritHandles->-1,InheritFromProcessHandle->-1,FileName->-1");
+				sendLogs(currentProcessId, L"ZwCreateProcessEx", L"0,-1,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritHandles->-1,InheritFromProcessHandle->-1,FileName->-1");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwCreateProcessEx", L"1,0,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritHandles->-1,InheritFromProcessHandle->-1,FileName->-1");
+				sendLogs(currentProcessId, L"ZwCreateProcessEx", L"1,0,ssssss,ProcessHandle->-1,PID->-1,DesiredAccess->-1,InheritHandles->-1,InheritFromProcessHandle->-1,FileName->-1");
 			break;
 		}
 		if(parameter != NULL)
@@ -948,51 +995,51 @@ NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 NTSTATUS newZwQueueApcThread(HANDLE ThreadHandle, PIO_APC_ROUTINE ApcRoutine, PVOID ApcRoutineContext, PIO_STATUS_BLOCK ApcStatusBlock, ULONG ApcReserved)
 {
 	NTSTATUS statusCall;
-	ULONG currentProc, tid;
-	DWORD pid;
-	PWCHAR parameter = NULL;
+	ULONG currentProcessId, targetThreadId;
+	DWORD targetProcessId;
 	USHORT log_lvl = LOG_ERROR;
 	PETHREAD eThread = NULL;
+	PWCHAR parameter = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWQUEUEAPCTHREAD)(oldZwQueueApcThread))(ThreadHandle, ApcRoutine, ApcRoutineContext, ApcStatusBlock, ApcReserved);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
-		tid = getTIDByHandle(ThreadHandle);
+		targetThreadId = getTIDByHandle(ThreadHandle);
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
-		if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)tid, &eThread)))
-			pid = *(DWORD*)((PCHAR)eThread+0x1EC);
+		if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)targetThreadId, &eThread)))
+			targetProcessId = *(DWORD*)((PCHAR)eThread+0x1EC);
 		else
-			pid = -1;
+			targetProcessId = 0;
 			
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssss,ThreadHandle->0x%08x,TID->%d,PID->%d,ApcRoutine->0x%08x", ThreadHandle, tid, pid, ApcRoutine)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssss,ThreadHandle->0x%08x,TID->%d,PID->%d,ApcRoutine->0x%08x", ThreadHandle, targetThreadId, targetProcessId, ApcRoutine)))
 				log_lvl = LOG_PARAM;
 			
-			if(pid)
-				startMonitoringProcess(pid);
+			if(targetProcessId)
+				startMonitoringProcess(targetProcessId);
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ThreadHandle->0x%08x,TID->%d,PID->%d,ApcRoutine->0x%08x", statusCall, ThreadHandle, tid, pid, ApcRoutine)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ThreadHandle->0x%08x,TID->%d,PID->%d,ApcRoutine->0x%08x", statusCall, ThreadHandle, targetThreadId, targetProcessId, ApcRoutine)))
 				log_lvl = LOG_PARAM;
 		}
 		
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwQueueApcThread", parameter);
+				sendLogs(currentProcessId, L"ZwQueueApcThread", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwQueueApcThread", L"0,-1,ssss,ThreadHandle->ERROR,TID->ERROR,PID->ERROR,ApcRoutine->ERROR");
+				sendLogs(currentProcessId, L"ZwQueueApcThread", L"0,-1,ssss,ThreadHandle->ERROR,TID->ERROR,PID->ERROR,ApcRoutine->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwQueueApcThread", L"1,0,ssss,ThreadHandle->ERROR,TID->ERROR,PID->ERROR,ApcRoutine->ERROR");
+				sendLogs(currentProcessId, L"ZwQueueApcThread", L"1,0,ssss,ThreadHandle->ERROR,TID->ERROR,PID->ERROR,ApcRoutine->ERROR");
 			break;
 		}
 		if(parameter != NULL)
@@ -1010,7 +1057,7 @@ NTSTATUS newZwQueueApcThread(HANDLE ThreadHandle, PIO_APC_ROUTINE ApcRoutine, PV
 //	Return value :
 //		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtCreateThread.html
 //	Process :
-//		Gets the thread's owner, proceeds the call then adds immediately the PID to the monitored
+//		Gets the thread's owner, proceeds the call then adds immediately the targetProcessId to the monitored
 //		processes list if it succeeded. Then logs.
 //	Notes :
 //		Actually, a race condition occurs : we must create the thread before adding the remote process
@@ -1020,23 +1067,24 @@ NTSTATUS newZwQueueApcThread(HANDLE ThreadHandle, PIO_APC_ROUTINE ApcRoutine, PV
 //		- Create the thread in suspended state and resume it after adding the process to the list to avoid
 //		race condition issues.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PCLIENT_ID ClientId, PCONTEXT ThreadContext, PINITIAL_TEB InitialTeb, BOOLEAN CreateSuspended)
+NTSTATUS newZwCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PCLIENT_ID ClientID, PCONTEXT ThreadContext, PINITIAL_TEB InitialTeb, BOOLEAN CreateSuspended)
 {
-	NTSTATUS statusCall, errorCode;
-	ULONG currentProc, pid, tid;
-	PWCHAR parameter = NULL;
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, targetProcessId, createdThreadId;
 	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
+	
 	HANDLE kThreadHandle;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	
-	pid = getPIDByHandle(ProcessHandle);	// faster than placing it after the monitored process check
-	statusCall = ((ZWCREATETHREAD)(oldZwCreateThread))(ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, ClientId, ThreadContext, InitialTeb, CreateSuspended);
+	targetProcessId = getPIDByHandle(ProcessHandle);	// faster than placing it after the monitored process check
+	statusCall = ((ZWCREATETHREAD)(oldZwCreateThread))(ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, ClientID, ThreadContext, InitialTeb, CreateSuspended);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
-		if(NT_SUCCESS(statusCall) && pid)
-			startMonitoringProcess(pid);	// <-- RACE CONDITION
+		if(NT_SUCCESS(statusCall) && targetProcessId)
+			startMonitoringProcess(targetProcessId);	// <-- RACE CONDITION
 		
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		_try
@@ -1047,41 +1095,41 @@ NTSTATUS newZwCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJ
 		} 
 		__except (EXCEPTION_EXECUTE_HANDLER)
 		{
-			errorCode = GetExceptionCode();
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR", errorCode)))
-				sendLogs(currentProc, L"ZwCreateThread", parameter);
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR", exceptionCode)))
+				sendLogs(currentProcessId, L"ZwCreateThread", parameter);
 			else 
-				sendLogs(currentProc, L"ZwCreateThread", L"0,-1,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwCreateThread", L"0,-1,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
 			if(parameter)
 				ExFreePool(parameter);
-			return errorCode;
+			return exceptionCode;
 		}
 		
-		tid = getTIDByHandle(kThreadHandle);
+		createdThreadId = getTIDByHandle(kThreadHandle);
 		
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssss,PID->%d,ThreadHandle->0x%08x,TID->%d,CreateSuspended->%d,DesiredAccess->0x%08x", kThreadHandle, pid, tid, CreateSuspended, DesiredAccess)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssss,PID->%d,ThreadHandle->0x%08x,TID->%d,CreateSuspended->%d,DesiredAccess->0x%08x", kThreadHandle, targetProcessId, createdThreadId, CreateSuspended, DesiredAccess)))
 				log_lvl = LOG_PARAM;
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,PID->%d,ThreadHandle->0x%08x,TID->%d,CreateSuspended->%d,DesiredAccess->0x%08x", statusCall, kThreadHandle, pid, tid, CreateSuspended, DesiredAccess)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,PID->%d,ThreadHandle->0x%08x,TID->%d,CreateSuspended->%d,DesiredAccess->0x%08x", statusCall, kThreadHandle, targetProcessId, createdThreadId, CreateSuspended, DesiredAccess)))
 				log_lvl = LOG_PARAM;
 		}
 		
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwCreateThread", parameter);
+				sendLogs(currentProcessId, L"ZwCreateThread", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwCreateThread", L"0,-1,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwCreateThread", L"0,-1,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwCreateThread", L"1,0,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwCreateThread", L"1,0,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
 			break;
 		}
 		if(parameter != NULL)
@@ -1108,46 +1156,46 @@ NTSTATUS newZwCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJ
 NTSTATUS newZwMapViewOfSection(HANDLE SectionHandle, HANDLE ProcessHandle, PVOID *BaseAddress, ULONG_PTR ZeroBits, SIZE_T CommitSize, PLARGE_INTEGER SectionOffset, PSIZE_T ViewSize, SECTION_INHERIT InheritDisposition, ULONG AllocationType, ULONG Win32Protect)
 {
 	NTSTATUS statusCall;
-	ULONG pid, currentProc;
-	PWCHAR parameter = NULL;
+	ULONG targetProcessId, currentProcessId;
 	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWMAPVIEWOFSECTION)(oldZwMapViewOfSection))(SectionHandle, ProcessHandle, BaseAddress, ZeroBits, CommitSize, SectionOffset, ViewSize, InheritDisposition, AllocationType, Win32Protect);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
-		pid = getPIDByHandle(ProcessHandle);
+		targetProcessId = getPIDByHandle(ProcessHandle);
 		
-		if(currentProc != pid)
+		if(currentProcessId != targetProcessId)
 		{
 			parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 			
 			if(NT_SUCCESS(statusCall))
 			{
 				log_lvl = LOG_SUCCESS;
-				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,SectionHandle->0x%08x,Win32Protect->%d", ProcessHandle, pid, BaseAddress, SectionHandle, Win32Protect)))
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,SectionHandle->0x%08x,Win32Protect->%d", ProcessHandle, targetProcessId, BaseAddress, SectionHandle, Win32Protect)))
 					log_lvl = LOG_PARAM;
-				if(pid)
-					startMonitoringProcess(pid);
+				if(targetProcessId)
+					startMonitoringProcess(targetProcessId);
 			}
 			else
 			{
 				log_lvl = LOG_ERROR;
-				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,SectionHandle->0x%08x,Win32Protect->%d", statusCall, ProcessHandle, pid, BaseAddress, SectionHandle, Win32Protect)))
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,SectionHandle->0x%08x,Win32Protect->%d", statusCall, ProcessHandle, targetProcessId, BaseAddress, SectionHandle, Win32Protect)))
 					log_lvl = LOG_PARAM;
 			}
 			
 			switch(log_lvl)
 			{
 				case LOG_PARAM:
-					sendLogs(currentProc, L"NtMapViewOfSection", parameter);
+					sendLogs(currentProcessId, L"NtMapViewOfSection", parameter);
 				break;
 				case LOG_SUCCESS:
-					sendLogs(currentProc, L"NtMapViewOfSection", L"0,-1,sssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,SectionHandle->ERROR,Win32Protect->ERROR");
+					sendLogs(currentProcessId, L"NtMapViewOfSection", L"0,-1,sssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,SectionHandle->ERROR,Win32Protect->ERROR");
 				break;
 				default:
-					sendLogs(currentProc, L"NtMapViewOfSection", L"1,0,sssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,SectionHandle->ERROR,Win32Protect->ERROR");
+					sendLogs(currentProcessId, L"NtMapViewOfSection", L"1,0,sssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,SectionHandle->ERROR,Win32Protect->ERROR");
 				break;
 			}
 			if(parameter != NULL)
@@ -1171,49 +1219,49 @@ NTSTATUS newZwMapViewOfSection(HANDLE SectionHandle, HANDLE ProcessHandle, PVOID
 NTSTATUS newZwSetContextThread(HANDLE ThreadHandle, PCONTEXT Context)
 {
 	NTSTATUS statusCall;
-	ULONG currentProc, tid;
-	DWORD pid;
+	ULONG currentProcessId, targetThreadId;
+	DWORD targetProcessId;
+	USHORT log_lvl = LOG_ERROR;
 	PWCHAR parameter = NULL;
 	PETHREAD eThread = NULL;
-	USHORT log_lvl = LOG_ERROR;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWSETCONTEXTTHREAD)(oldZwSetContextThread))(ThreadHandle, Context);
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
-		tid = getTIDByHandle(ThreadHandle);
+		targetThreadId = getTIDByHandle(ThreadHandle);
 		
-		if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)tid, &eThread)))
-			pid = *(DWORD*)((PCHAR)eThread+0x1EC);
+		if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)targetThreadId, &eThread)))
+			targetProcessId = *(DWORD*)((PCHAR)eThread+0x1EC);
 		else
-			pid = -1;
+			targetProcessId = -1;
 			
 			
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sss,ThreadHandle->0x%08x,TID->%d,PID->%d", ThreadHandle, tid, pid)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sss,ThreadHandle->0x%08x,TID->%d,PID->%d", ThreadHandle, targetThreadId, targetProcessId)))
 				log_lvl = LOG_PARAM;
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,%d,sss,ThreadHandle->0x%08x,TID->%d,PID->%d", statusCall, ThreadHandle, tid, pid)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,%d,sss,ThreadHandle->0x%08x,TID->%d,PID->%d", statusCall, ThreadHandle, targetThreadId, targetProcessId)))
 				log_lvl = LOG_PARAM;
 		}
 	
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwSetContextThread", parameter);
+				sendLogs(currentProcessId, L"ZwSetContextThread", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwSetContextThread", L"0,-1,sss,ThreadHandle->ERROR,TID->ERROR,PID->ERROR");
+				sendLogs(currentProcessId, L"ZwSetContextThread", L"0,-1,sss,ThreadHandle->ERROR,TID->ERROR,PID->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwSetContextThread", L"1,0,sss,ThreadHandle->ERROR,TID->ERROR,PID->ERROR");
+				sendLogs(currentProcessId, L"ZwSetContextThread", L"1,0,sss,ThreadHandle->ERROR,TID->ERROR,PID->ERROR");
 			break;
 		}
 		if(parameter != NULL)
@@ -1236,14 +1284,14 @@ NTSTATUS newZwSetContextThread(HANDLE ThreadHandle, PCONTEXT Context)
 NTSTATUS newZwSystemDebugControl(SYSDBG_COMMAND Command, PVOID InputBuffer, ULONG InputBufferLength, PVOID OutputBuffer, ULONG OutputBufferLength, PULONG ReturnLength)
 {
 	NTSTATUS statusCall;
-	ULONG currentProc;
-	PWCHAR parameter = NULL;
+	ULONG currentProcessId;
 	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWSYSTEMDEBUGCONTROL)(oldZwSystemDebugControl))(Command, InputBuffer, InputBufferLength, OutputBuffer, OutputBufferLength, ReturnLength);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		if(NT_SUCCESS(statusCall))
@@ -1262,13 +1310,13 @@ NTSTATUS newZwSystemDebugControl(SYSDBG_COMMAND Command, PVOID InputBuffer, ULON
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwSystemDebugControl", parameter);
+				sendLogs(currentProcessId, L"ZwSystemDebugControl", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwSystemDebugControl", L"0,-1,s,Command->Error");
+				sendLogs(currentProcessId, L"ZwSystemDebugControl", L"0,-1,s,Command->Error");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwSystemDebugControl", L"1,0,s,Command->Error");
+				sendLogs(currentProcessId, L"ZwSystemDebugControl", L"1,0,s,Command->Error");
 			break;
 		}
 		if(parameter != NULL)
@@ -1291,21 +1339,24 @@ NTSTATUS newZwSystemDebugControl(SYSDBG_COMMAND Command, PVOID InputBuffer, ULON
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PIO_STATUS_BLOCK IoStatusBlock, PLARGE_INTEGER AllocationSize, ULONG FileAttributes, ULONG ShareAccess, ULONG CreateDisposition, ULONG CreateOptions, PVOID EaBuffer, ULONG EaLength)
 {
-	NTSTATUS statusCall, errorCode;
-	ULONG currentProc, returnLength;
-	PWCHAR parameter = NULL;
-	HANDLE kRootDirectory, kFileHandle;
-	UNICODE_STRING full_path, kObjectName;
-	POBJECT_NAME_INFORMATION nameInfo = NULL;
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, returnLength;
 	USHORT log_lvl = LOG_ERROR;
+	UNICODE_STRING full_path;
+	PWCHAR parameter = NULL;
+	POBJECT_NAME_INFORMATION nameInformation = NULL;
+	
+	HANDLE kRootDirectory, kFileHandle;
+	UNICODE_STRING kObjectName;
+	
 	full_path.Buffer = NULL;
 	kObjectName.Buffer = NULL;
 	
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWCREATEFILE)(oldZwCreateFile))(FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, AllocationSize, FileAttributes, ShareAccess, CreateDisposition, CreateOptions, EaBuffer, EaLength);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		kObjectName.Buffer = NULL;
@@ -1329,29 +1380,29 @@ NTSTATUS newZwCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 		}
 		__except (EXCEPTION_EXECUTE_HANDLER)
 		{
-			errorCode = GetExceptionCode();
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR", errorCode)))
-				sendLogs(currentProc, L"ZwCreateFile", parameter);
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR", exceptionCode)))
+				sendLogs(currentProcessId, L"ZwCreateFile", parameter);
 			else 
-				sendLogs(currentProc ,L"ZwCreateFile", L"0,-1,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR");
+				sendLogs(currentProcessId ,L"ZwCreateFile", L"0,-1,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR");
 			ExFreePool(parameter);
 			if(kObjectName.Buffer)
 				ExFreePool(kObjectName.Buffer);
-			return errorCode;
+			return exceptionCode;
 		}
 		
 		if(kRootDirectory)	// handle the not null rootdirectory case
 		{
 			// allocate both name information struct and unicode string buffer
-			nameInfo = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-			if(nameInfo)
+			nameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+			if(nameInformation)
 			{
-				if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, nameInfo, MAXSIZE, NULL)))
+				if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, nameInformation, MAXSIZE, NULL)))
 				{
-					full_path.MaximumLength = nameInfo->Name.Length + kObjectName.Length + 2 + sizeof(WCHAR);
+					full_path.MaximumLength = nameInformation->Name.Length + kObjectName.Length + 2 + sizeof(WCHAR);
 					full_path.Buffer = ExAllocatePoolWithTag(NonPagedPool, full_path.MaximumLength, BUFFER_TAG);
 					RtlZeroMemory(full_path.Buffer, full_path.MaximumLength);
-					RtlCopyUnicodeString(&full_path, &(nameInfo->Name));
+					RtlCopyUnicodeString(&full_path, &(nameInformation->Name));
 					RtlAppendUnicodeToString(&full_path, L"\\");
 					RtlAppendUnicodeStringToString(&full_path, &kObjectName);
 				}
@@ -1376,21 +1427,21 @@ NTSTATUS newZwCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwCreateFile", parameter);
+				sendLogs(currentProcessId, L"ZwCreateFile", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwCreateFile", L"0,-1,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwCreateFile", L"0,-1,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwCreateFile", L"1,0,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwCreateFile", L"1,0,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR");
 			break;
 		}
 		if(kObjectName.Buffer && kObjectName.Buffer != full_path.Buffer)
 			ExFreePool(kObjectName.Buffer);
 		if(parameter != NULL)
 			ExFreePool(parameter);
-		if(nameInfo != NULL)
-			ExFreePool(nameInfo);
+		if(nameInformation != NULL)
+			ExFreePool(nameInformation);
 		if(full_path.Buffer)
 			ExFreePool(full_path.Buffer);
 	}
@@ -1409,53 +1460,52 @@ NTSTATUS newZwCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwReadFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRoutine, PVOID ApcContext, PIO_STATUS_BLOCK IoStatusBlock, PVOID Buffer, ULONG Length, PLARGE_INTEGER ByteOffset, PULONG Key)
 {
-	NTSTATUS statusCall, errorCode;
-	ULONG currentProc, returnLength;
-	POBJECT_NAME_INFORMATION nameInfo = NULL;
-	PWCHAR parameter = NULL;
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, returnLength;
 	USHORT log_lvl = LOG_ERROR;
+	POBJECT_NAME_INFORMATION nameInformation = NULL;
+	PWCHAR parameter = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWREADFILE)(oldZwReadFile))(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
-		
-		nameInfo = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-		if(nameInfo)
-			ZwQueryObject(FileHandle, ObjectNameInformation, nameInfo, MAXSIZE, NULL);
+		nameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+		if(nameInformation)
+			ZwQueryObject(FileHandle, ObjectNameInformation, nameInformation, MAXSIZE, NULL);
 		
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;
-			if(nameInfo && parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,%d,ssss,FileHandle->0x%08x,FileName->%wZ,Buffer->0x%08x,Length->%d", statusCall, FileHandle, &(nameInfo->Name), Buffer, Length)))
+			if(nameInformation && parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,%d,ssss,FileHandle->0x%08x,FileName->%wZ,Buffer->0x%08x,Length->%d", statusCall, FileHandle, &(nameInformation->Name), Buffer, Length)))
 				log_lvl = LOG_PARAM;
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			if(nameInfo && parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,ssss,FileHandle->0x%08x,FileName->%wZ,Buffer->0x%08x,Length->%d", statusCall, FileHandle, &(nameInfo->Name), Buffer, Length)))
+			if(nameInformation && parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,ssss,FileHandle->0x%08x,FileName->%wZ,Buffer->0x%08x,Length->%d", statusCall, FileHandle, &(nameInformation->Name), Buffer, Length)))
 				log_lvl = LOG_PARAM;
 		}
 		
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwReadFile", parameter);
+				sendLogs(currentProcessId, L"ZwReadFile", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwReadFile", L"0,-1,ssss,FileHandle->ERROR,FileName->ERROR,Buffer->ERROR,Length->ERROR");
+				sendLogs(currentProcessId, L"ZwReadFile", L"0,-1,ssss,FileHandle->ERROR,FileName->ERROR,Buffer->ERROR,Length->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwReadFile", L"1,0,ssss,FileHandle->ERROR,FileName->ERROR,Buffer->ERROR,Length->ERROR");
+				sendLogs(currentProcessId, L"ZwReadFile", L"1,0,ssss,FileHandle->ERROR,FileName->ERROR,Buffer->ERROR,Length->ERROR");
 			break;
 		}
 		if(parameter != NULL)
 			ExFreePool(parameter);
-		if(nameInfo != NULL)
-			ExFreePool(nameInfo);
+		if(nameInformation != NULL)
+			ExFreePool(nameInformation);
 	}
 
 	return statusCall;
@@ -1476,50 +1526,50 @@ NTSTATUS newZwReadFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRouti
 NTSTATUS newZwWriteFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRoutine, PVOID ApcContext, PIO_STATUS_BLOCK IoStatusBlock, PVOID Buffer, ULONG Length, PLARGE_INTEGER ByteOffset, PULONG Key)
 {
 	NTSTATUS statusCall;
-	ULONG currentProc, returnLength;
-	POBJECT_NAME_INFORMATION nameInfo = NULL;
-	PWCHAR parameter = NULL;
+	ULONG currentProcessId, returnLength;
 	USHORT log_lvl = LOG_ERROR;
+	POBJECT_NAME_INFORMATION nameInformation = NULL;
+	PWCHAR parameter = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWWRITEFILE)(oldZwWriteFile))(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, Buffer, Length, ByteOffset, Key);
 
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
-		nameInfo = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-		if(nameInfo)
-			ZwQueryObject(FileHandle, ObjectNameInformation, nameInfo, MAXSIZE, NULL);
+		nameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+		if(nameInformation)
+			ZwQueryObject(FileHandle, ObjectNameInformation, nameInformation, MAXSIZE, NULL);
 		
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;
-			if(nameInfo && parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssss,FileHandle->0x%08x,FileName->%wZ,Buffer->0x%08x,Length->%d", FileHandle, &(nameInfo->Name), Buffer, Length)))
+			if(nameInformation && parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssss,FileHandle->0x%08x,FileName->%wZ,Buffer->0x%08x,Length->%d", FileHandle, &(nameInformation->Name), Buffer, Length)))
 				log_lvl = LOG_PARAM;
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			if(nameInfo && parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,ssss,FileHandle->0x%08x,FileName->%wZ,Buffer->0x%08x,Length->%d", statusCall, FileHandle, &(nameInfo->Name), Buffer, Length)))
+			if(nameInformation && parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,ssss,FileHandle->0x%08x,FileName->%wZ,Buffer->0x%08x,Length->%d", statusCall, FileHandle, &(nameInformation->Name), Buffer, Length)))
 				log_lvl = LOG_PARAM;
 		}
 		
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwWriteFile", parameter);
+				sendLogs(currentProcessId, L"ZwWriteFile", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwWriteFile", L"0,-1,ssss,FileHandle->ERROR,FileName->ERROR,Buffer->ERROR,Length->ERROR");
+				sendLogs(currentProcessId, L"ZwWriteFile", L"0,-1,ssss,FileHandle->ERROR,FileName->ERROR,Buffer->ERROR,Length->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwWriteFile", L"1,0,ssss,FileHandle->ERROR,FileName->ERROR,Buffer->ERROR,Length->ERROR");
+				sendLogs(currentProcessId, L"ZwWriteFile", L"1,0,ssss,FileHandle->ERROR,FileName->ERROR,Buffer->ERROR,Length->ERROR");
 			break;
 		}
 		if(parameter != NULL)
 			ExFreePool(parameter);
-		if(nameInfo != NULL)
-			ExFreePool(nameInfo);
+		if(nameInformation != NULL)
+			ExFreePool(nameInformation);
 	}
 
 	return statusCall;
@@ -1540,19 +1590,20 @@ NTSTATUS newZwWriteFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRout
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes)
 {
-	NTSTATUS statusCall, errorCode;
-	ULONG currentProc;
-	PWCHAR parameter = NULL;
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId;
 	USHORT log_lvl = LOG_ERROR;
-	UNICODE_STRING kObjectName;
+	PWCHAR parameter = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	UNICODE_STRING kObjectName;
+	kObjectName.Buffer = NULL;
+	
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWDELETEFILE)(oldZwDeleteFile))(ObjectAttributes);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
-		kObjectName.Buffer = NULL;
 		__try
 		{
 			if(ExGetPreviousMode() != KernelMode)
@@ -1568,7 +1619,7 @@ NTSTATUS newZwDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes)
 				RtlCopyUnicodeString(&kObjectName, ObjectAttributes->ObjectName);
 			else
 			{
-				sendLogs(currentProc ,L"ZwDeleteFile", L"0,-1,s,FileName->ERROR");
+				sendLogs(currentProcessId ,L"ZwDeleteFile", L"0,-1,s,FileName->ERROR");
 				if(parameter)
 					ExFreePool(parameter);
 				return statusCall;
@@ -1576,16 +1627,16 @@ NTSTATUS newZwDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes)
 		}
 		__except (EXCEPTION_EXECUTE_HANDLER)
 		{
-			errorCode = GetExceptionCode();
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,FileName->ERROR", errorCode)))
-				sendLogs(currentProc, L"ZwDeleteFile", parameter);
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,FileName->ERROR", exceptionCode)))
+				sendLogs(currentProcessId, L"ZwDeleteFile", parameter);
 			else 
-				sendLogs(currentProc ,L"ZwDeleteFile", L"0,-1,s,FileName->ERROR");
+				sendLogs(currentProcessId ,L"ZwDeleteFile", L"0,-1,s,FileName->ERROR");
 			if(parameter)
 				ExFreePool(parameter);
 			if(kObjectName.Buffer)
 				ExFreePool(kObjectName.Buffer);
-			return errorCode;
+			return exceptionCode;
 		}
 		
 		if(NT_SUCCESS(statusCall))
@@ -1604,13 +1655,13 @@ NTSTATUS newZwDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes)
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwDeleteFile", parameter);
+				sendLogs(currentProcessId, L"ZwDeleteFile", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwDeleteFile", L"0,-1,s,FileName->ERROR");
+				sendLogs(currentProcessId, L"ZwDeleteFile", L"0,-1,s,FileName->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwDeleteFile", L"1,0,s,FileName->ERROR");
+				sendLogs(currentProcessId, L"ZwDeleteFile", L"1,0,s,FileName->ERROR");
 			break;
 		}
 		if(kObjectName.Buffer)
@@ -1633,28 +1684,30 @@ NTSTATUS newZwDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes)
 //		Copy the FileHandle parameter, then checks the FileInformationClass argument.
 //		If FileDispositionInformation, the file may be deleted, the FileInformation->DeleteFile
 //		parameter is copied and tested.
-//		If FileRenameInformation, the FileInformation->FileName parameter is copied along with the
+//		If FileRenameInformationrmation, the FileInformation->FileName parameter is copied along with the
 //		FileInformation->RootDirectory parameter, then the call is logged.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlock, PVOID FileInformation, ULONG Length, FILE_INFORMATION_CLASS FileInformationClass)
 {
-	NTSTATUS statusCall, errorCode;
-	ULONG currentProc;
-	ULONG kFileNameLength;
-	HANDLE kFileHandle, kRootDirectory;
-	BOOLEAN kDeleteFile;
-	UNICODE_STRING full_path;
-	PFILE_RENAME_INFORMATION kFileRenameInformation = NULL;
-	POBJECT_NAME_INFORMATION originalName = NULL;
-	PWCHAR renamedfileName = NULL;
-	PWCHAR parameter = NULL;
-	PWCHAR kFileName = NULL;
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId;
 	USHORT log_lvl = LOG_ERROR;
+	UNICODE_STRING full_path;
+	POBJECT_NAME_INFORMATION originalNameInformation = NULL;
+	PWCHAR parameter = NULL;
+	PWCHAR newFileName = NULL;
+	
+	BOOLEAN kDeleteFile;
+	ULONG kFileNameLength;
+	PFILE_RENAME_INFORMATION kFileRenameInformation = NULL;
+	PWCHAR kFileName = NULL;
+	HANDLE kFileHandle, kRootDirectory;
+	
 	full_path.Buffer = NULL;
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWSETINFORMATIONFILE)(oldZwSetInformationFile))(FileHandle, IoStatusBlock, FileInformation, Length, FileInformationClass);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		__try 
@@ -1665,24 +1718,24 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 		} 
 		__except(EXCEPTION_EXECUTE_HANDLER)
 		{
-			errorCode = GetExceptionCode();
+			exceptionCode = GetExceptionCode();
 			if(FileInformationClass == FileDispositionInformation)
 			{
-				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,FileHandle->-1,FileName->-1,FileInformationClass->-1", errorCode)))
-					sendLogs(currentProc, L"ZwSetInformationFile (Delete)", parameter);
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,FileHandle->-1,FileName->-1,FileInformationClass->-1", exceptionCode)))
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Delete)", parameter);
 				else 
-					sendLogs(currentProc, L"ZwSetInformationFile (Delete)", L"0,-1,sss,FileHandle->-1,FileName->-1,FileInformationClass->-1");
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Delete)", L"0,-1,sss,FileHandle->-1,FileName->-1,FileInformationClass->-1");
 			}
-			else if(FileInformationClass == FileRenameInformation)
+			else if(FileInformationClass == FileRenameInformationrmation)
 			{
-				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,FileHandle->-1,OriginalName->-1,Renamed->-1,FileInformationClass->-1", errorCode)))
-					sendLogs(currentProc, L"ZwSetInformationFile (Rename)", parameter);
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,FileHandle->-1,OriginalName->-1,Renamed->-1,FileInformationClass->-1", exceptionCode)))
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Rename)", parameter);
 				else 
-					sendLogs(currentProc, L"ZwSetInformationFile (Rename)", L"0,-1,ssss,FileHandle->-1,OriginalName->-1,Renamed->-1,FileInformationClass->-1");
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Rename)", L"0,-1,ssss,FileHandle->-1,OriginalName->-1,Renamed->-1,FileInformationClass->-1");
 			}
 			if(parameter)
 				ExFreePool(parameter);
-			return errorCode;
+			return exceptionCode;
 		}
 		
 		// CHANGE FILE DISPOSITION INFORMATION CASE
@@ -1696,52 +1749,52 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 			}
 			__except(EXCEPTION_EXECUTE_HANDLER)
 			{
-				errorCode = GetExceptionCode();
-				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,FileHandle->-1,FileName->-1,FileInformationClass->-1", errorCode)))
-					sendLogs(currentProc, L"ZwSetInformationFile (Delete)", parameter);
+				exceptionCode = GetExceptionCode();
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,FileHandle->-1,FileName->-1,FileInformationClass->-1", exceptionCode)))
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Delete)", parameter);
 				else
-					sendLogs(currentProc, L"ZwSetInformationFile (Delete)", L"0,-1,sss,FileHandle->-1,FileName->-1,FileInformationClass->-1");
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Delete)", L"0,-1,sss,FileHandle->-1,FileName->-1,FileInformationClass->-1");
 				if(parameter)
 					ExFreePool(parameter);
-				return errorCode;
+				return exceptionCode;
 			}
 			
 			if(kDeleteFile == TRUE)
 			{
-				originalName = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-				if(originalName && parameter)
-					ZwQueryObject(kFileHandle, ObjectNameInformation, originalName, MAXSIZE, NULL);
+				originalNameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+				if(originalNameInformation && parameter)
+					ZwQueryObject(kFileHandle, ObjectNameInformation, originalNameInformation, MAXSIZE, NULL);
 				if(NT_SUCCESS(statusCall))
 				{
 					log_lvl = LOG_SUCCESS;
-					if(parameter && originalName && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,%d,sss,FileHandle->0x%08x,FileName->%wZ,FileInformationClass->%d", statusCall, FileHandle, &(originalName->Name), FileInformationClass)))
+					if(parameter && originalNameInformation && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,%d,sss,FileHandle->0x%08x,FileName->%wZ,FileInformationClass->%d", statusCall, FileHandle, &(originalNameInformation->Name), FileInformationClass)))
 						log_lvl = LOG_PARAM;
 				}
 				else
 				{
 					log_lvl = LOG_ERROR;
-					if(parameter && originalName && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,FileHandle->0x%08x,FileName->%wZ,FileInformationClass->%d", statusCall, FileHandle, &(originalName->Name), FileInformationClass)))
+					if(parameter && originalNameInformation && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sss,FileHandle->0x%08x,FileName->%wZ,FileInformationClass->%d", statusCall, FileHandle, &(originalNameInformation->Name), FileInformationClass)))
 						log_lvl = LOG_PARAM;
 				}
 				switch(log_lvl)
 				{
 					case LOG_PARAM:
-						sendLogs(currentProc, L"ZwSetInformationFile (Delete)", parameter);
+						sendLogs(currentProcessId, L"ZwSetInformationFile (Delete)", parameter);
 					break;
 					case LOG_SUCCESS:
-						sendLogs(currentProc, L"ZwSetInformationFile (Delete)", L"1,0,sss,FileHandle->Error,FileName->Error,FileInformationClass->Error");
+						sendLogs(currentProcessId, L"ZwSetInformationFile (Delete)", L"1,0,sss,FileHandle->Error,FileName->Error,FileInformationClass->Error");
 					break;
 					default:
-						sendLogs(currentProc, L"ZwSetInformationFile (Delete)", L"0,0,sss,FileHandle->Error,FileName->Error,FileInformationClass->Error");
+						sendLogs(currentProcessId, L"ZwSetInformationFile (Delete)", L"0,0,sss,FileHandle->Error,FileName->Error,FileInformationClass->Error");
 					break;
 				}
-				if(originalName != NULL)
-					ExFreePool(originalName);
+				if(originalNameInformation != NULL)
+					ExFreePool(originalNameInformation);
 			}
 		}
 		
 		// RENAME FILE CASE
-		if(FileInformationClass == FileRenameInformation)
+		if(FileInformationClass == FileRenameInformationrmation)
 		{
 			__try 
 			{
@@ -1753,11 +1806,10 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 				kFileRenameInformation = (PFILE_RENAME_INFORMATION)FileInformation;
 				kRootDirectory = kFileRenameInformation->RootDirectory;
 				kFileNameLength = kFileRenameInformation->FileNameLength;
-				
 				kFileName = ExAllocatePoolWithTag(NonPagedPool, kFileNameLength + sizeof(WCHAR), BUFFER_TAG);
 				if(!kFileName)
 				{
-					sendLogs(currentProc, L"ZwSetInformationFile (Rename)", L"0,-1,ssss,FileHandle->-1,OriginalName->-1,Renamed->-1,FileInformationClass->-1");
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Rename)", L"0,-1,ssss,FileHandle->-1,OriginalName->-1,Renamed->-1,FileInformationClass->-1");
 					if(parameter)
 						ExFreePool(parameter);
 					return statusCall;
@@ -1767,30 +1819,30 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 			}
 			__except(EXCEPTION_EXECUTE_HANDLER)
 			{
-				errorCode = GetExceptionCode();
-				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,FileHandle->-1,OriginalName->-1,Renamed->-1,FileInformationClass->-1", errorCode)))
-					sendLogs(currentProc, L"ZwSetInformationFile (Rename)", parameter);
+				exceptionCode = GetExceptionCode();
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,FileHandle->-1,OriginalName->-1,Renamed->-1,FileInformationClass->-1", exceptionCode)))
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Rename)", parameter);
 				else
-					sendLogs(currentProc, L"ZwSetInformationFile (Rename)", L"0,-1,ssss,FileHandle->-1,OriginalName->-1,Renamed->-1,FileInformationClass->-1");
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Rename)", L"0,-1,ssss,FileHandle->-1,OriginalName->-1,Renamed->-1,FileInformationClass->-1");
 				if(parameter)
 					ExFreePool(parameter);
 				if(kFileName)
 					ExFreePool(kFileName);
-				return errorCode;
+				return exceptionCode;
 			}
 			
 			if(kRootDirectory)	// handle the not null RootDirectory case
 			{
 				// allocate both name information struct and unicode string buffer
-				originalName = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-				if(originalName)
+				originalNameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+				if(originalNameInformation)
 				{
-					if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, originalName, MAXSIZE, NULL)) && kFileNameLength < 0xFFF0)
+					if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, originalNameInformation, MAXSIZE, NULL)) && kFileNameLength < 0xFFF0)
 					{
-						full_path.MaximumLength = originalName->Name.Length + (USHORT)kFileNameLength + 2 + sizeof(WCHAR);
+						full_path.MaximumLength = originalNameInformation->Name.Length + (USHORT)kFileNameLength + 2 + sizeof(WCHAR);
 						full_path.Buffer = ExAllocatePoolWithTag(NonPagedPool, full_path.MaximumLength, BUFFER_TAG);
 						RtlZeroMemory(full_path.Buffer, full_path.MaximumLength);
-						RtlCopyUnicodeString(&full_path, &(originalName->Name));
+						RtlCopyUnicodeString(&full_path, &(originalNameInformation->Name));
 						RtlAppendUnicodeToString(&full_path, L"\\");
 						RtlAppendUnicodeToString(&full_path, kFileName);
 					}
@@ -1801,22 +1853,22 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 			else
 				RtlInitUnicodeString(&full_path, kFileName);
 			
-			originalName = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-			if(originalName && parameter)
-				ZwQueryObject(kFileHandle, ObjectNameInformation, originalName, MAXSIZE, NULL);
+			originalNameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+			if(originalNameInformation && parameter)
+				ZwQueryObject(kFileHandle, ObjectNameInformation, originalNameInformation, MAXSIZE, NULL);
 			
 			if(NT_SUCCESS(statusCall))
 			{
 				log_lvl = LOG_SUCCESS;
-				if(parameter && originalName && kFileName)
-					if(NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssss,FileHandle->0x%08x,OriginalName->%wZ,Renamed->%wZ,FileInformationClass->%d", FileHandle, &(originalName->Name), &full_path, FileInformationClass)))
+				if(parameter && originalNameInformation && kFileName)
+					if(NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssss,FileHandle->0x%08x,OriginalName->%wZ,Renamed->%wZ,FileInformationClass->%d", FileHandle, &(originalNameInformation->Name), &full_path, FileInformationClass)))
 						log_lvl = LOG_PARAM;
 			}
 			else
 			{
 				log_lvl = LOG_ERROR;
-				if(parameter && originalName && kFileName)
-					if(NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,FileHandle->0x%08x,,OriginalName->%wZ,Renamed->%wZ,FileInformationClass->%d", statusCall, FileHandle, &(originalName->Name), &full_path, FileInformationClass)))
+				if(parameter && originalNameInformation && kFileName)
+					if(NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,FileHandle->0x%08x,,OriginalName->%wZ,Renamed->%wZ,FileInformationClass->%d", statusCall, FileHandle, &(originalNameInformation->Name), &full_path, FileInformationClass)))
 						log_lvl = LOG_PARAM;
 			}
 			
@@ -1824,19 +1876,19 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 				ExFreePool(full_path.Buffer);
 			if(kFileName)
 				ExFreePool(kFileName);
-			if(originalName)
-				ExFreePool(originalName);
+			if(originalNameInformation)
+				ExFreePool(originalNameInformation);
 			
 			switch(log_lvl)
 			{
 				case LOG_PARAM:
-					sendLogs(currentProc, L"ZwSetInformationFile (Rename)", parameter);
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Rename)", parameter);
 				break;
 				case LOG_SUCCESS:
-					sendLogs(currentProc, L"ZwSetInformationFile (Rename)", L"1,0,ssss,FileHandle->Error,OriginalName->Error,Renamed->Error,FileInformationClass->Error");
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Rename)", L"1,0,ssss,FileHandle->Error,OriginalName->Error,Renamed->Error,FileInformationClass->Error");
 				break;
 				default:
-					sendLogs(currentProc, L"ZwSetInformationFile (Rename)", L"0,-1,ssss,FileHandle->Error,OriginalName->Error,Renamed->Error,FileInformationClass->Error");
+					sendLogs(currentProcessId, L"ZwSetInformationFile (Rename)", L"0,-1,ssss,FileHandle->Error,OriginalName->Error,Renamed->Error,FileInformationClass->Error");
 				break;
 			}
 		}
@@ -1859,15 +1911,15 @@ NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlo
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlock, PVOID FileInformation, ULONG Length, FILE_INFORMATION_CLASS FileInformationClass)
 {
-	NTSTATUS statusCall, errorCode;
-	DWORD currentProc;
-	PWCHAR parameter = NULL;
+	NTSTATUS statusCall, exceptionCode;
+	DWORD currentProcessId;
 	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
 	
-	currentProc = (ULONG)PsGetCurrentProcessId();
+	currentProcessId = (ULONG)PsGetcurrentProcessId();
 	statusCall = ((ZWQUERYINFORMATIONFILE)(oldZwQueryInformationFile))(FileHandle, IoStatusBlock, FileInformation, Length, FileInformationClass);
 	
-	if(isProcessMonitoredByPid(currentProc))
+	if(isProcessMonitoredByPID(currentProcessId))
 	{
 	
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
@@ -1888,13 +1940,13 @@ NTSTATUS newZwQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusB
 		switch(log_lvl)
 		{
 			case LOG_PARAM:
-				sendLogs(currentProc, L"ZwQueryInformationFile", parameter);
+				sendLogs(currentProcessId, L"ZwQueryInformationFile", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProc, L"ZwQueryInformationFile", L"0,-1,ss,FileHandle->ERROR,FileInformationClass->ERROR");
+				sendLogs(currentProcessId, L"ZwQueryInformationFile", L"0,-1,ss,FileHandle->ERROR,FileInformationClass->ERROR");
 			break;
 			default:
-				sendLogs(currentProc, L"ZwQueryInformationFile", L"1,0,ss,FileHandle->ERROR,FileInformationClass->ERROR");
+				sendLogs(currentProcessId, L"ZwQueryInformationFile", L"1,0,ss,FileHandle->ERROR,FileInformationClass->ERROR");
 			break;
 		}
 		if(parameter)
@@ -1914,7 +1966,7 @@ NTSTATUS newZwQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusB
 //	Notes :
 //		http://en.wikipedia.org/wiki/Control_register#CR0
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void disable_cr0()
+VOID disable_cr0()
 {
 	__asm
 	{
@@ -1937,7 +1989,7 @@ void disable_cr0()
 //	Notes :
 //		http://en.wikipedia.org/wiki/Control_register#CR0
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void enable_cr0()
+VOID enable_cr0()
 {
 	__asm
 	{
