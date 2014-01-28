@@ -107,6 +107,9 @@ VOID unhook_ssdt_entries()
 	
 	if(oldZwCreateMutant != NULL)
 		(ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_INDEX) = oldZwCreateMutant;
+	
+	if(oldZwDeviceIoControlFile != NULL)
+		(ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_INDEX) = oldZwDeviceIoControlFile;
 		
 	enable_cr0();
 }
@@ -182,6 +185,9 @@ VOID hook_ssdt_entries()
 
 	oldZwCreateMutant = (ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_INDEX);
 	(ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_INDEX) = newZwCreateMutant;
+	
+	oldZwDeviceIoControlFile = (ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_INDEX);
+	(ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_INDEX) = newZwDeviceIoControlFile;
 	
 	enable_cr0();
 }
@@ -878,11 +884,7 @@ NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 	PWCHAR parameter = NULL;
 	POBJECT_NAME_INFORMATION nameInformation = NULL;
 	
-	HANDLE kRootDirectory, kProcessHandle;
-	UNICODE_STRING kObjectName;
-	
-	full_path.Buffer = NULL;
-	kObjectName.Buffer = NULL;
+	HANDLE kProcessHandle;
 	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
 	statusCall = ((ZWCREATEPROCESSEX)(oldZwCreateProcessEx))(ProcessHandle, DesiredAccess, ObjectAttributes, InheritFromProcessHandle, InheritHandles, SectionHandle, DebugPort, ExceptionPort, dunno);	 
@@ -890,30 +892,13 @@ NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 	if(isProcessMonitoredByPid(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
-		kObjectName.Buffer = NULL;
 		
 		__try 
 		{
 			if(ExGetPreviousMode() != KernelMode)
-			{
 				ProbeForRead(ProcessHandle, sizeof(HANDLE), 1);
-				if(ObjectAttributes)
-				{
-					ProbeForRead(ObjectAttributes, sizeof(OBJECT_ATTRIBUTES), 1);
-					ProbeForRead(ObjectAttributes->ObjectName, sizeof(UNICODE_STRING), 1);
-					ProbeForRead(ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length, 1);
-				}
-			}
 			kProcessHandle = *ProcessHandle;
 			childProcessId = getPIDByHandle(kProcessHandle);
-			if(ObjectAttributes)
-			{
-				kRootDirectory = ObjectAttributes->RootDirectory;
-				kObjectName.Length = ObjectAttributes->ObjectName->Length;
-				kObjectName.MaximumLength = ObjectAttributes->ObjectName->MaximumLength;
-				kObjectName.Buffer = ExAllocatePoolWithTag(NonPagedPool, kObjectName.MaximumLength, BUFFER_TAG);
-				RtlCopyUnicodeString(&kObjectName, ObjectAttributes->ObjectName);
-			}
 		} 
 		__except (EXCEPTION_EXECUTE_HANDLER)
 		{
@@ -923,35 +908,25 @@ NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 			else 
 				sendLogs(currentProcessId, L"ZwCreateProcessEx", L"0,-1,ssssss,ProcessHandle->ERROR,PID->ERROR,DesiredAccess->ERROR,InheritHandles->ERROR,InheritFromProcessHandle->ERROR,FileName->ERROR");
 			ExFreePool(parameter);
-			if(kObjectName.Buffer)
-				ExFreePool(kObjectName.Buffer);
 			return statusCall;
 		}
 		
-		if(kRootDirectory && ObjectAttributes)	// handle the not null rootdirectory case
+		// allocate both name information struct and unicode string buffer
+		nameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+		if(nameInformation && SectionHandle)
 		{
-			// allocate both name information struct and unicode string buffer
-			nameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
-			if(nameInformation)
+			if(NT_SUCCESS(ZwQueryObject(SectionHandle, ObjectNameInformation, nameInformation, MAXSIZE, NULL)))
 			{
-				if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, nameInformation, MAXSIZE, NULL)))
-				{
-					full_path.MaximumLength = nameInformation->Name.Length + kObjectName.Length + 2 + sizeof(WCHAR);
+					full_path.MaximumLength = nameInformation->Name.Length + 2 + sizeof(WCHAR);
 					full_path.Buffer = ExAllocatePoolWithTag(NonPagedPool, full_path.MaximumLength, BUFFER_TAG);
 					RtlZeroMemory(full_path.Buffer, full_path.MaximumLength);
 					RtlCopyUnicodeString(&full_path, &(nameInformation->Name));
-					RtlAppendUnicodeToString(&full_path, L"\\");
-					RtlAppendUnicodeStringToString(&full_path, &kObjectName);
-				}
-				else
-					RtlInitUnicodeString(&full_path, kObjectName.Buffer);
 			}
 			else
-				RtlInitUnicodeString(&full_path, kObjectName.Buffer);
+				RtlInitUnicodeString(&full_path, L"ERROR");
 		}
 		else
-			RtlInitUnicodeString(&full_path, kObjectName.Buffer);
-		
+			RtlInitUnicodeString(&full_path, L"ERROR");
 		
 		if(NT_SUCCESS(statusCall))
 		{
@@ -2056,6 +2031,64 @@ NTSTATUS newZwCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJ
 	}
 	return statusCall;
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs IOCTL from the malware
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566441%28v=vs.85%29.aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566441%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwDeviceIoControlFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRoutine, PVOID ApcContext, PIO_STATUS_BLOCK IoStatusBlock, ULONG IoControlCode, PVOID InputBuffer, ULONG InputBufferLength, PVOID OuputBuffer, ULONG OutputBufferLength)
+{
+	NTSTATUS statusCall, exceptionCode;
+	DWORD currentProcessId;
+	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	statusCall = ((ZWDEVICEIOCONTROLFILE)(oldZwDeviceIoControlFile))(FileHandle, Event, ApcRoutine, ApcContext, IoStatusBlock, IoControlCode, InputBuffer, InputBufferLength, OuputBuffer, OutputBufferLength);
+	
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		
+		//if(ExGetPreviousMode() != KernelMode)
+		//{
+			if(NT_SUCCESS(statusCall))
+			{
+				log_lvl = LOG_SUCCESS;
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ss,FileHandle->0x%08x,IoControlCode->0x%08x", FileHandle, IoControlCode)))
+					log_lvl = LOG_PARAM;
+			}
+			else
+			{
+				log_lvl = LOG_ERROR;
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,ss,FileHandle->0x%08x,IoControlCode->0x%08x", statusCall, FileHandle, IoControlCode)))
+					log_lvl = LOG_PARAM;
+			}
+			switch(log_lvl)
+			{
+				case LOG_PARAM:
+					sendLogs(currentProcessId, L"ZwDeviceIoControlFile", parameter);
+				break;
+			
+				case LOG_SUCCESS:
+					sendLogs(currentProcessId, L"ZwDeviceIoControlFile", L"0,-1,ss,FileHandle->ERROR,IoControlCode->ERROR");
+			break;
+			default:
+				sendLogs(currentProcessId, L"ZwDeviceIoControlFile", L"1,0,ss,FileHandle->ERROR,IoControlCode->ERROR");
+			break;
+		//}
+		if(parameter)
+			ExFreePool(parameter);
+		}
+	}
+	return statusCall;
+}
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :

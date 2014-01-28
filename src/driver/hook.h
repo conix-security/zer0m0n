@@ -1,4 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
 //
 //	zer0m0n DRIVER
 //
@@ -65,6 +66,7 @@
 #define SETINFORMATIONFILE_INDEX 0xe0
 #define QUERYINFORMATIONFILE_INDEX 0x97
 #define CREATEMUTANT_INDEX 0x2B
+#define DEVICEIOCONTROLFILE_INDEX 0x42
 
 /////////////////////////////////////////////////////////////////////////////		
 // STRUCTS
@@ -198,6 +200,7 @@ typedef NTSTATUS(*ZWDELETEFILE)(POBJECT_ATTRIBUTES);
 typedef NTSTATUS(*ZWSETINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
 typedef NTSTATUS(*ZWQUERYINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
 typedef NTSTATUS(*ZWCREATEMUTANT)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, BOOLEAN);
+typedef NTSTATUS(*ZWDEVICEIOCONTROLFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, ULONG, PVOID, ULONG, PVOID, ULONG);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
@@ -223,6 +226,7 @@ ZWDELETEFILE oldZwDeleteFile;
 ZWSETINFORMATIONFILE oldZwSetInformationFile;
 ZWQUERYINFORMATIONFILE oldZwQueryInformationFile;
 ZWCREATEMUTANT oldZwCreateMutant;
+ZWDEVICEIOCONTROLFILE oldZwDeviceIoControlFile;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
@@ -462,5 +466,15 @@ NTSTATUS newZwQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusB
 //		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, BOOLEAN InitialOwner);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs IOCTL from the malware
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566441%28v=vs.85%29.aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566441%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwDeviceIoControlFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRoutine, PVOID ApcContext, PIO_STATUS_BLOCK IoStatusBlock, ULONG IoControlCode, PVOID InputBuffer, ULONG InputBufferLength, PVOID OuputBuffer, ULONG OutputBufferLength);
 
 #endif
