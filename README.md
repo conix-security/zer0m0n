@@ -54,6 +54,17 @@ To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo 
 
 While submitting a new analysis, choose "kernelland" option on the Web interface, or use the option "kernel_analysis=yes" on commandline.
 
+SIGNATURES
+==========
+
+Signatures patterns have changed:
+
+- for registry operations, handles are not logged anymore (use of callbacks instead of hooks). The full path of accessed keys is now logged and may be used directly, including on values operations
+- for windows operations, there is no logging anymore
+- for IOCTLs operations (including Winsock operations), ZwDeviceIoControlFile hook will be implemented soon (only userland calls) :]
+- several other functions are not actually hooked and will be added later
+- signatures based on "global" results (registry / files / mutexes / networking / ...) still work fine
+
 COMPILATION
 ===========
 
