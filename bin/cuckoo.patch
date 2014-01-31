@@ -1,6 +1,6 @@
 diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.py
 --- original/analyzer/windows/analyzer.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/analyzer.py	2014-01-28 15:42:30.476413471 +0100
++++ new/analyzer/windows/analyzer.py	2014-01-31 21:43:44.775508446 +0100
 @@ -221,6 +221,26 @@ class PipeHandler(Thread):
                  else:
                      response = hookdll_encode(url_dlls)
@@ -28,11 +28,9 @@ diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.p
              # In case of PID, the client is trying to notify the creation of
              # a new process to be injected and monitored.
              elif command.startswith("PROCESS:"):
-Binary files original/analyzer/windows/dll/logs_dispatcher.exe and new/analyzer/windows/dll/logs_dispatcher.exe differ
-Binary files original/analyzer/windows/dll/zer0m0n.sys and new/analyzer/windows/dll/zer0m0n.sys differ
 diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib/api/process.py
 --- original/analyzer/windows/lib/api/process.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/lib/api/process.py	2014-01-28 15:42:30.549746806 +0100
++++ new/analyzer/windows/lib/api/process.py	2014-01-31 21:43:44.878841780 +0100
 @@ -5,6 +5,8 @@
  import os
  import logging
@@ -167,7 +165,7 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
      def wait(self):
 diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/windows/modules/packages/applet.py
 --- original/analyzer/windows/modules/packages/applet.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/applet.py	2014-01-28 15:42:30.526413472 +0100
++++ new/analyzer/windows/modules/packages/applet.py	2014-01-31 21:43:44.852175113 +0100
 @@ -50,6 +50,9 @@ class Applet(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -195,7 +193,7 @@ diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/win
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/windows/modules/packages/bin.py
 --- original/analyzer/windows/modules/packages/bin.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/bin.py	2014-01-28 15:42:30.516413471 +0100
++++ new/analyzer/windows/modules/packages/bin.py	2014-01-31 21:43:44.852175113 +0100
 @@ -11,8 +11,12 @@ class Shellcode(Package):
      def start(self, path):
          p = Process()
@@ -213,7 +211,7 @@ diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/window
          return p.pid
 diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/windows/modules/packages/cpl.py
 --- original/analyzer/windows/modules/packages/cpl.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/cpl.py	2014-01-28 15:42:30.516413471 +0100
++++ new/analyzer/windows/modules/packages/cpl.py	2014-01-31 21:43:44.852175113 +0100
 @@ -26,18 +26,22 @@ class CPL(Package):
  
          dll = self.options.get("dll", None)
@@ -241,7 +239,7 @@ diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/windows/modules/packages/dll.py
 --- original/analyzer/windows/modules/packages/dll.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/dll.py	2014-01-28 15:42:30.533080138 +0100
++++ new/analyzer/windows/modules/packages/dll.py	2014-01-31 21:43:44.852175113 +0100
 @@ -14,6 +14,9 @@ class Dll(Package):
          function = self.options.get("function", "DllMain")
          arguments = self.options.get("arguments", None)
@@ -270,7 +268,7 @@ diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/windows/modules/packages/doc.py
 --- original/analyzer/windows/modules/packages/doc.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/doc.py	2014-01-28 15:42:30.513080138 +0100
++++ new/analyzer/windows/modules/packages/doc.py	2014-01-31 21:43:44.852175113 +0100
 @@ -37,17 +37,22 @@ class DOC(Package):
  
          dll = self.options.get("dll", None)
@@ -298,7 +296,7 @@ diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/windows/modules/packages/exe.py
 --- original/analyzer/windows/modules/packages/exe.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/exe.py	2014-01-28 15:42:30.513080138 +0100
++++ new/analyzer/windows/modules/packages/exe.py	2014-01-31 21:43:44.852175113 +0100
 @@ -13,17 +13,21 @@ class Exe(Package):
          free = self.options.get("free", False)
          args = self.options.get("arguments", None)
@@ -325,7 +323,7 @@ diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/window
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/windows/modules/packages/generic.py
 --- original/analyzer/windows/modules/packages/generic.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/generic.py	2014-01-28 15:42:30.516413471 +0100
++++ new/analyzer/windows/modules/packages/generic.py	2014-01-31 21:43:44.852175113 +0100
 @@ -14,6 +14,9 @@ class Genric(Package):
      def start(self, path):
          free = self.options.get("free", False)
@@ -354,7 +352,7 @@ diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/wi
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windows/modules/packages/html.py
 --- original/analyzer/windows/modules/packages/html.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/html.py	2014-01-28 15:42:30.533080138 +0100
++++ new/analyzer/windows/modules/packages/html.py	2014-01-31 21:43:44.852175113 +0100
 @@ -14,6 +14,9 @@ class HTML(Package):
      def start(self, path):
          free = self.options.get("free", False)
@@ -383,7 +381,7 @@ diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windo
          else:
 diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows/modules/packages/ie.py
 --- original/analyzer/windows/modules/packages/ie.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/ie.py	2014-01-28 15:42:30.533080138 +0100
++++ new/analyzer/windows/modules/packages/ie.py	2014-01-31 21:43:44.855508445 +0100
 @@ -15,6 +15,9 @@ class IE(Package):
      def start(self, url):
          free = self.options.get("free", False)
@@ -412,7 +410,7 @@ diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows
          else:
 diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/windows/modules/packages/jar.py
 --- original/analyzer/windows/modules/packages/jar.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/jar.py	2014-01-28 15:42:30.533080138 +0100
++++ new/analyzer/windows/modules/packages/jar.py	2014-01-31 21:43:44.852175113 +0100
 @@ -33,6 +33,9 @@ class Jar(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -441,7 +439,7 @@ diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/windows/modules/packages/pdf.py
 --- original/analyzer/windows/modules/packages/pdf.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/pdf.py	2014-01-28 15:42:30.533080138 +0100
++++ new/analyzer/windows/modules/packages/pdf.py	2014-01-31 21:43:44.855508445 +0100
 @@ -34,17 +34,21 @@ class PDF(Package):
  
          dll = self.options.get("dll", None)
@@ -468,7 +466,7 @@ diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/windows/modules/packages/vbs.py
 --- original/analyzer/windows/modules/packages/vbs.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/vbs.py	2014-01-28 15:42:30.533080138 +0100
++++ new/analyzer/windows/modules/packages/vbs.py	2014-01-31 21:43:44.855508445 +0100
 @@ -33,17 +33,21 @@ class VBS(Package):
  
          dll = self.options.get("dll", None)
@@ -495,7 +493,7 @@ diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/windows/modules/packages/xls.py
 --- original/analyzer/windows/modules/packages/xls.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/xls.py	2014-01-28 15:42:30.533080138 +0100
++++ new/analyzer/windows/modules/packages/xls.py	2014-01-31 21:43:44.855508445 +0100
 @@ -36,17 +36,21 @@ class XLS(Package):
  
          dll = self.options.get("dll", None)
@@ -522,7 +520,7 @@ diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/windows/modules/packages/zip.py
 --- original/analyzer/windows/modules/packages/zip.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/zip.py	2014-01-28 15:42:30.523080138 +0100
++++ new/analyzer/windows/modules/packages/zip.py	2014-01-31 21:43:44.852175113 +0100
 @@ -43,17 +43,21 @@ class Zip(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -547,248 +545,22 @@ diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/window
              p.resume()
              return p.pid
          else:
-diff -rupN original/lib/cuckoo/common/logtbl.c new/lib/cuckoo/common/logtbl.c
---- original/lib/cuckoo/common/logtbl.c	1970-01-01 01:00:00.000000000 +0100
-+++ new/lib/cuckoo/common/logtbl.c	2014-01-28 15:42:30.889746811 +0100
-@@ -0,0 +1,222 @@
-+#include <stdio.h>
-+
-+const char *logtbl[] = {
-+    "__process__",
-+    "__thread__",
-+    "NtDeleteFile",
-+    "CreateDirectoryW",
-+    "CreateDirectoryExW",
-+    "RemoveDirectoryA",
-+    "RemoveDirectoryW",
-+    "FindFirstFileExA",
-+    "FindFirstFileExW",
-+    "DeleteFileA",
-+    "DeleteFileW",
-+    "UnhookWindowsHookEx",
-+    "LdrGetDllHandle",
-+    "ExitWindowsEx",
-+    "IsDebuggerPresent",
-+    "LookupPrivilegeValueW",
-+    "NtClose",
-+    "URLDownloadToFileW",
-+    "InternetReadFile",
-+    "InternetWriteFile",
-+    "InternetCloseHandle",
-+    "DnsQuery_A",
-+    "DnsQuery_UTF8",
-+    "DnsQuery_W",
-+    "getaddrinfo",
-+    "GetAddrInfoW",
-+    "NtTerminateProcess",
-+    "ExitProcess",
-+    "system",
-+    "RegOpenKeyExA",
-+    "RegOpenKeyExW",
-+    "RegDeleteKeyA",
-+    "RegDeleteKeyW",
-+    "RegEnumKeyW",
-+    "RegDeleteValueA",
-+    "RegDeleteValueW",
-+    "RegCloseKey",
-+    "NtRenameKey",
-+    "NtEnumerateKey",
-+    "NtDeleteKey",
-+    "NtDeleteValueKey",
-+    "NtLoadKey",
-+    "NtSaveKey",
-+    "ControlService",
-+    "DeleteService",
-+    "NtDelayExecution",
-+    "NtDelayExecution",
-+    "WSAStartup",
-+    "gethostbyname",
-+    "socket",
-+    "connect",
-+    "send",
-+    "sendto",
-+    "recv",
-+    "recvfrom",
-+    "accept",
-+    "bind",
-+    "bind",
-+    "setsockopt",
-+    "listen",
-+    "select",
-+    "ioctlsocket",
-+    "closesocket",
-+    "shutdown",
-+    "WSARecv",
-+    "WSARecvFrom",
-+    "WSASend",
-+    "WSASendTo",
-+    "WSASocketA",
-+    "WSASocketW",
-+    "ConnectEx",
-+    "NtOpenMutant",
-+    "NtGetContextThread",
-+    "NtSetContextThread",
-+    "NtResumeThread",
-+    "NtTerminateThread",
-+    "ExitThread",
-+    "FindWindowA",
-+    "FindWindowW",
-+    "FindWindowExA",
-+    "FindWindowExA",
-+    "FindWindowExW",
-+    "FindWindowExW",
-+    "NtCreateFile",
-+    "NtOpenFile",
-+    "NtReadFile",
-+    "NtWriteFile",
-+    "NtDeviceIoControlFile",
-+    "NtQueryDirectoryFile",
-+    "NtQueryInformationFile",
-+    "NtSetInformationFile",
-+    "NtOpenDirectoryObject",
-+    "NtCreateDirectoryObject",
-+    "MoveFileWithProgressW",
-+    "CopyFileA",
-+    "CopyFileW",
-+    "CopyFileExW",
-+    "SetWindowsHookExA",
-+    "SetWindowsHookExW",
-+    "LdrLoadDll",
-+    "LdrGetProcedureAddress",
-+    "DeviceIoControl",
-+    "WriteConsoleA",
-+    "WriteConsoleW",
-+    "InternetOpenA",
-+    "InternetOpenW",
-+    "InternetConnectA",
-+    "InternetConnectW",
-+    "InternetOpenUrlA",
-+    "InternetOpenUrlW",
-+    "HttpOpenRequestA",
-+    "HttpOpenRequestW",
-+    "HttpSendRequestA",
-+    "HttpSendRequestW",
-+    "NtCreateProcess",
-+    "NtCreateProcessEx",
-+    "NtCreateUserProcess",
-+    "NtOpenProcess",
-+    "NtOpenProcess",
-+    "NtCreateSection",
-+    "NtOpenSection",
-+    "CreateProcessInternalW",
-+    "ShellExecuteExW",
-+    "NtAllocateVirtualMemory",
-+    "NtReadVirtualMemory",
-+    "ReadProcessMemory",
-+    "NtWriteVirtualMemory",
-+    "WriteProcessMemory",
-+    "NtProtectVirtualMemory",
-+    "VirtualProtectEx",
-+    "NtFreeVirtualMemory",
-+    "VirtualFreeEx",
-+    "RegCreateKeyExA",
-+    "RegCreateKeyExW",
-+    "RegEnumKeyExA",
-+    "RegEnumKeyExW",
-+    "RegEnumValueA",
-+    "RegEnumValueA",
-+    "RegEnumValueW",
-+    "RegEnumValueW",
-+    "RegSetValueExA",
-+    "RegSetValueExA",
-+    "RegSetValueExW",
-+    "RegSetValueExW",
-+    "RegQueryValueExA",
-+    "RegQueryValueExA",
-+    "RegQueryValueExW",
-+    "RegQueryValueExW",
-+    "RegQueryInfoKeyA",
-+    "RegQueryInfoKeyW",
-+    "NtCreateKey",
-+    "NtOpenKey",
-+    "NtOpenKeyEx",
-+    "NtReplaceKey",
-+    "NtEnumerateValueKey",
-+    "NtSetValueKey",
-+    "NtSetValueKey",
-+    "NtQueryValueKey",
-+    "NtQueryValueKey",
-+    "NtQueryMultipleValueKey",
-+    "NtLoadKey2",
-+    "NtLoadKeyEx",
-+    "NtQueryKey",
-+    "NtSaveKeyEx",
-+    "OpenSCManagerA",
-+    "OpenSCManagerW",
-+    "CreateServiceA",
-+    "CreateServiceW",
-+    "OpenServiceA",
-+    "OpenServiceW",
-+    "StartServiceA",
-+    "StartServiceW",
-+    "TransmitFile",
-+    "NtCreateMutant",
-+    "NtCreateNamedPipeFile",
-+    "NtCreateThread",
-+    "NtOpenThread",
-+    "NtSuspendThread",
-+    "CreateThread",
-+    "CreateRemoteThread",
-+    "RtlCreateUserThread",
-+    "ZwMapViewOfSection",
-+    "GetSystemMetrics",
-+    "GetCursorPos",
-+    "REGISTRY_OPEN_KEY",
-+    "REGISTRY_DELETE_KEY",
-+    "REGISTRY_VALUE_KEY_SET",
-+    "REGISTRY_VALUE_KEY_DELETE",
-+    "REGISTRY_KEY_RENAME",
-+    "REGISTRY_ENUMERATE_KEY",
-+    "REGISTRY_ENUMERATE_VALUE_KEY",
-+    "REGISTRY_QUERY_KEY",
-+    "REGISTRY_QUERY_VALUE_KEY",
-+    "REGISTRY_CREATE_KEY",
-+    "LOAD_DRIVER",
-+    "ZwOpenProcess",
-+    "ZwOpenThread",
-+    "ZwQuerySystemInformation",
-+    "ZwWriteVirtualMemory",
-+    "ZwDebugActiveProcess",
-+    "ZwCreateProcess",
-+    "ZwCreateProcessEx",
-+    "ZwQueueApcThread",
-+    "ZwCreateThread",
-+    "NtMapViewOfSection",
-+    "ZwSetContextThread",
-+    "ZwSystemDebugControl",
-+    "ZwCreateFile",
-+    "ZwReadFile",
-+    "ZwWriteFile",
-+    "ZwDeleteFile",
-+    "ZwSetInformationFile (Delete)",
-+    "ZwSetInformationFile (Rename)",
-+    "ZwQueryInformationFile",
-+    "ZwCreateMutant",
-+    "ZwDeviceIoControlFile",
-+    NULL
-+};
-+char logtbl_explained[sizeof(logtbl)/sizeof(char *)] = {0};
 diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
 --- original/lib/cuckoo/common/logtbl.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/lib/cuckoo/common/logtbl.py	2014-01-28 15:42:30.853080143 +0100
++++ new/lib/cuckoo/common/logtbl.py	2014-01-31 21:43:45.212175113 +0100
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
 +	# Copyright (C) 2010-2013 Cuckoo Sandbox Developers.
  # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
  # See the file 'docs/LICENSE' for copying permission.
  
-@@ -193,4 +193,36 @@ table = [
+@@ -193,4 +193,38 @@ table = [
      ("ZwMapViewOfSection", "process", ("ppPp", "SectionHandle", "ProcessHandle", "BaseAddress", "SectionOffset")),
      ("GetSystemMetrics", "misc", ("l", "SystemMetricIndex")),
      ("GetCursorPos", "misc", ("ll", "x", "y")),
 +	("REGISTRY_OPEN_KEY", "registry", ("s", "SubKey")),
 +	("REGISTRY_DELETE_KEY", "registry", ("s", "SubKey")),
-+	("REGISTRY_VALUE_KEY_SET", "registry", ("ss", "SubKey", "ValueName")),
++	("REGISTRY_VALUE_KEY_SET", "registry", ("sss", "SubKey", "ValueName", "Data")),
 +	("REGISTRY_VALUE_KEY_DELETE", "registry", ("ss", "SubKey", "ValueName")),
 +	("REGISTRY_KEY_RENAME", "registry", ("ss", "SubKey", "NewName")),
 +	("REGISTRY_ENUMERATE_KEY", "registry", ("s", "SubKey")),
@@ -816,12 +588,14 @@ diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
 +	("ZwSetInformationFile (Delete)", "filesystem", ("sss", "FileHandle", "FileName", "FileInformationClass")),
 +	("ZwSetInformationFile (Rename)", "filesystem", ("ssss", "FileHandle", "OriginalName", "Renamed", "FileInformationClass")),
 +	("ZwQueryInformationFile", "filesystem", ("ss", "FileHandle", "FileInformationClass")),
-+	("ZwCreateMutant", "system", ("ssss", "MutantHandle", "DesiredAccess", "ObjectAttributes", "InitialOwner")),
++	("ZwCreateMutant", "synchronization", ("ssss", "MutantHandle", "DesiredAccess", "MutexName", "InitialOwner")),
 +	("ZwDeviceIoControlFile", "system", ("ss", "FileHandle", "IoControlColde")),
++	("ZwTerminateProcess", "process", ("sss", "ProcessHandle", "PID", "ExitStatus")),
++	("ZwDelayExecution", "system", ("s", "DelayInterval")),
  ]
 diff -rupN original/lib/cuckoo/core/database.py new/lib/cuckoo/core/database.py
 --- original/lib/cuckoo/core/database.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/lib/cuckoo/core/database.py	2014-01-28 15:42:30.836413476 +0100
++++ new/lib/cuckoo/core/database.py	2014-01-31 21:43:45.192175112 +0100
 @@ -271,6 +271,7 @@ class Task(Base):
      target = Column(Text(), nullable=False)
      category = Column(String(255), nullable=False)
@@ -915,7 +689,7 @@ diff -rupN original/lib/cuckoo/core/database.py new/lib/cuckoo/core/database.py
                     task.machine,
 diff -rupN original/modules/processing/behavior.py new/modules/processing/behavior.py
 --- original/modules/processing/behavior.py	2014-01-09 15:47:55.000000000 +0100
-+++ new/modules/processing/behavior.py	2014-01-28 15:42:30.709746807 +0100
++++ new/modules/processing/behavior.py	2014-01-31 21:43:45.092175113 +0100
 @@ -329,6 +329,20 @@ class Summary:
              name = self._check_registry(registry, subkey, handle)
              if name and name not in self.keys:
@@ -939,7 +713,7 @@ diff -rupN original/modules/processing/behavior.py new/modules/processing/behavi
              subkey = ""
 diff -rupN original/web/submission/views.py new/web/submission/views.py
 --- original/web/submission/views.py	2014-01-09 15:47:49.000000000 +0100
-+++ new/web/submission/views.py	2014-01-28 15:42:31.989746827 +0100
++++ new/web/submission/views.py	2014-01-31 21:43:49.655508451 +0100
 @@ -26,6 +26,7 @@ def index(request):
          package = request.POST.get("package", "")
          timeout = force_int(request.POST.get("timeout"))
@@ -978,7 +752,7 @@ diff -rupN original/web/submission/views.py new/web/submission/views.py
                                   custom=custom,
 diff -rupN original/web/templates/submission/index.html new/web/templates/submission/index.html
 --- original/web/templates/submission/index.html	2014-01-09 15:47:49.000000000 +0100
-+++ new/web/templates/submission/index.html	2014-01-28 15:42:31.676413489 +0100
++++ new/web/templates/submission/index.html	2014-01-31 21:43:48.692175118 +0100
 @@ -101,6 +101,15 @@ $(document).ready( function() {
                                  <label for="form_options">Options</label>
                                  <input type="text" class="form-control" id="form_options" name="options" />

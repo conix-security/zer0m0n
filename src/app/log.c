@@ -77,14 +77,12 @@ void log_raw_direct(const char *buf, size_t length, int g_sock) {
     while (sent < length) {
         r = send(g_sock, buf+sent, length-sent, 0);
         if (r == -1) {
-			fprintf(stderr, "send() error : %x\n", WSAGetLastError());
+			fprintf(stderr, "send() error : %d, socket %x\n", WSAGetLastError(),g_sock);
             return;
         }
         sent += r;
     }
 }
-
-
 
 static void log_int8(char value)
 {
@@ -189,102 +187,104 @@ void loq(int g_sock, int index, const char *name,
     va_start(args, fmt);
 	fmtbak = fmt;
 
-	if(1==1)
+	EnterCriticalSection(&g_mutex);
+	
+    bson_init( b );
+    bson_append_int( b, "I", index );
+    bson_append_string( b, "name", name );
+    bson_append_string( b, "type", "info" );
+
+    bson_append_start_array( b, "args" );
+    bson_append_string( b, "0", "is_success" );
+    bson_append_string( b, "1", "retval" );
+
+    while (--count != 0 || *fmt != 0) 
 	{
-        bson_init( b );
-        bson_append_int( b, "I", index );
-        bson_append_string( b, "name", name );
-        bson_append_string( b, "type", "info" );
+        // we have to find the next format specifier
+		if(count == 0) 
+		{
+            // end of format
+            if(*fmt == 0) break;
 
-        bson_append_start_array( b, "args" );
-        bson_append_string( b, "0", "is_success" );
-        bson_append_string( b, "1", "retval" );
+            // set the count, possibly with a repeated format specifier
+            count = *fmt >= '2' && *fmt <= '9' ? *fmt++ - '0' : 1;
 
-        while (--count != 0 || *fmt != 0) {
-            // we have to find the next format specifier
-            if(count == 0) {
-                // end of format
-                if(*fmt == 0) break;
-
-                // set the count, possibly with a repeated format specifier
-                count = *fmt >= '2' && *fmt <= '9' ? *fmt++ - '0' : 1;
-
-                // the next format specifier
-                key = *fmt++;
-            }
-
-            pname = va_arg(args, const char *);
-            _snprintf(g_istr, 4, "%u", argnum);
-            argnum++;
-
-            //on certain formats, we need to tell cuckoo about them for nicer display / matching
-            if (key == 'p' || key == 'P') {
-                bson_append_start_array( b, g_istr );
-                bson_append_string( b, "0", pname );
-                bson_append_string( b, "1", "p" );
-                bson_append_finish_array( b );
-            } else {
-                bson_append_string( b, g_istr, pname );
-            }
-
-            //now ignore the values
-            if(key == 's') {
-                (void) va_arg(args, const char *);
-            }
-            else if(key == 'S') {
-                (void) va_arg(args, int);
-                (void) va_arg(args, const char *);
-            }
-            else if(key == 'u') {
-                (void) va_arg(args, const wchar_t *);
-            }
-            else if(key == 'U') {
-                (void) va_arg(args, int);
-                (void) va_arg(args, const wchar_t *);
-            }
-            else if(key == 'b') {
-                (void) va_arg(args, size_t);
-                (void) va_arg(args, const char *);
-            }
-            else if(key == 'B') {
-                (void) va_arg(args, size_t *);
-                (void) va_arg(args, const char *);
-            }
-            else if(key == 'i') {
-                (void) va_arg(args, int);
-            }
-            else if(key == 'l' || key == 'p') {
-                (void) va_arg(args, long);
-            }
-            else if(key == 'L' || key == 'P') {
-                (void) va_arg(args, long *);
-            }
-            else if(key == 'o') {
-                (void) va_arg(args, UNICODE_STRING *);
-            }
-            else if(key == 'O') {
-                (void) va_arg(args, OBJECT_ATTRIBUTES *);
-            }
-            else if(key == 'a') {
-                (void) va_arg(args, int);
-                (void) va_arg(args, const char **);
-            }
-            else if(key == 'A') {
-                (void) va_arg(args, int);
-                (void) va_arg(args, const wchar_t **);
-            }
-            else if(key == 'r' || key == 'R') {
-                (void) va_arg(args, unsigned long);
-                (void) va_arg(args, unsigned long);
-                (void) va_arg(args, unsigned char *);
-            }
-
+            // the next format specifier
+            key = *fmt++;
         }
-        bson_append_finish_array( b );
-        bson_finish( b );
-        log_raw_direct(bson_data( b ), bson_size( b ), g_sock);
-        bson_destroy( b );
-    }
+
+        pname = va_arg(args, const char *);
+        _snprintf(g_istr, 4, "%u", argnum);
+        argnum++;
+
+        //on certain formats, we need to tell cuckoo about them for nicer display / matching
+        if (key == 'p' || key == 'P') {
+            bson_append_start_array( b, g_istr );
+            bson_append_string( b, "0", pname );
+            bson_append_string( b, "1", "p" );
+            bson_append_finish_array( b );
+        } else {
+            bson_append_string( b, g_istr, pname );
+        }
+
+        //now ignore the values
+        if(key == 's') {
+            (void) va_arg(args, const char *);
+        }
+        else if(key == 'S') {
+            (void) va_arg(args, int);
+            (void) va_arg(args, const char *);
+        }
+        else if(key == 'u') {
+            (void) va_arg(args, const wchar_t *);
+        }
+        else if(key == 'U') {
+            (void) va_arg(args, int);
+            (void) va_arg(args, const wchar_t *);
+        }
+        else if(key == 'b') {
+            (void) va_arg(args, size_t);
+            (void) va_arg(args, const char *);
+        }
+        else if(key == 'B') {
+            (void) va_arg(args, size_t *);
+            (void) va_arg(args, const char *);
+        }
+        else if(key == 'i') {
+            (void) va_arg(args, int);
+        }
+        else if(key == 'l' || key == 'p') {
+            (void) va_arg(args, long);
+        }
+        else if(key == 'L' || key == 'P') {
+            (void) va_arg(args, long *);
+        }
+        else if(key == 'o') {
+            (void) va_arg(args, UNICODE_STRING *);
+        }
+        else if(key == 'O') {
+            (void) va_arg(args, OBJECT_ATTRIBUTES *);
+        }
+        else if(key == 'a') {
+            (void) va_arg(args, int);
+            (void) va_arg(args, const char **);
+        }
+        else if(key == 'A') {
+            (void) va_arg(args, int);
+            (void) va_arg(args, const wchar_t **);
+        }
+        else if(key == 'r' || key == 'R') {
+            (void) va_arg(args, unsigned long);
+            (void) va_arg(args, unsigned long);
+            (void) va_arg(args, unsigned char *);
+        }
+
+	}
+    bson_append_finish_array( b );
+    bson_finish( b );
+    log_raw_direct(bson_data( b ), bson_size( b ), g_sock);
+    bson_destroy( b );
+
 
     va_end(args);
     fmt = fmtbak;
@@ -485,7 +485,6 @@ int log_init(unsigned int ip, unsigned short port, int debug)
         WSAStartup(MAKEWORD(2, 2), &wsa);
 
         g_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		printf("\t[-] New socket created.\n");
 
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(port);

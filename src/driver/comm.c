@@ -65,7 +65,6 @@ NTSTATUS ConnectCallback(PFLT_PORT ClientPort, PVOID ServerPortCookie, PVOID Con
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID DisconnectCallback(PVOID ConnectionCookie)
 {
-	// computer is being shutting down
 }
 
 
@@ -83,7 +82,7 @@ VOID DisconnectCallback(PVOID ConnectionCookie)
 //		- Retrieves the process name from the pid and saves the whole data into an ANSI string.
 //		- Generates an ANSI string with the message, with the process name, pid, and function name, and the
 //		- generic "parameter" parameter. The resulting output will basically follow this scheme:
-//			"pid","process_name","function_name","FAILED/SUCCESS/BLOCKED(0/1/2)","return_value","number_of_arguments","argument1->value","argument2->value"...
+//			"pid","process_name","function_name","FAILED/SUCCESS(0/1)","return_value","number_of_arguments","argument1->value","argument2->value"...
 //		- Uses the "mutex" mutex to avoid concurrency when using the FltSendMessage() function.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
@@ -93,17 +92,23 @@ NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
 	UNICODE_STRING processName;
 	ULONG sizeBuf;
 	
+	LARGE_INTEGER timeout;
+	timeout.QuadPart = -((LONGLONG)0.1*10*1000*1000);
+	
 	if(message == NULL)
 		return STATUS_INVALID_PARAMETER;
-	
+
+    #ifdef DEBUG
+    DbgPrint("SendLogs\n");
+    #endif
+
 	processName.Length = 0;
 	processName.MaximumLength = NTSTRSAFE_UNICODE_STRING_MAX_CCH * sizeof(WCHAR);
 	processName.Buffer = ExAllocatePoolWithTag(NonPagedPool, processName.MaximumLength, PROCNAME_TAG);
 	if(!processName.Buffer)
 	{
-		DbgPrint("ProcessName.Buffer error\n");
 		KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
-		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, NULL);
+		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, &timeout);
 		KeReleaseMutex(&mutex, FALSE);
 		return STATUS_NO_MEMORY;
 	}
@@ -111,9 +116,8 @@ NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
 	status = getProcNameByPID(pid, &processName);
 	if(!NT_SUCCESS(status))
 	{
-		DbgPrint("getProcNameByPID() error\n");
 		KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
-		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, NULL);
+		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, &timeout);
 		KeReleaseMutex(&mutex, FALSE);
 		ExFreePool(processName.Buffer);
 		return status;
@@ -122,9 +126,8 @@ NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
 	status = RtlStringCbPrintfA(buf, MAXSIZE, "%d,%wZ,%ws,%ws\n", pid, &processName, message, parameter);
 	if(!NT_SUCCESS(status) || status == STATUS_BUFFER_OVERFLOW)
 	{
-		DbgPrint("RtlStringCbPrintfA() error\n");
 		KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
-		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, NULL);
+		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, &timeout);
 		KeReleaseMutex(&mutex, FALSE);
 		ExFreePool(processName.Buffer);
 		return status;
@@ -133,9 +136,8 @@ NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
 	status = RtlStringCbLengthA(buf, MAXSIZE, &sizeBuf);
 	if(!NT_SUCCESS(status))
 	{
-		DbgPrint("RtlStringCbLengthA() error\n");
 		KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
-		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, NULL);
+		status = FltSendMessage(filter, &clientPort, "0,error,error,error\n", 20, NULL, 0, &timeout);
 		KeReleaseMutex(&mutex, FALSE);
 		ExFreePool(processName.Buffer);
 		return status;
@@ -143,10 +145,19 @@ NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
 	
 
 	KeWaitForMutexObject(&mutex, Executive, KernelMode, FALSE, NULL);
-	status = FltSendMessage(filter, &clientPort, buf, sizeBuf, NULL, 0, NULL);
+	#ifdef DEBUG
+	DbgPrint("\tmsg : %s\n", buf);
+	#endif
+    
+    status = FltSendMessage(filter, &clientPort, buf, sizeBuf, NULL, 0, &timeout);
 	KeReleaseMutex(&mutex, FALSE);
 	ExFreePool(processName.Buffer);
-
+	
+	#ifdef DEBUG
+	if(!NT_SUCCESS(status))
+		DbgPrint("return : 0x%08x\n", status);
+	#endif DEBUG	
+	
 	return status;
 }
 

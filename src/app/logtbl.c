@@ -217,6 +217,8 @@ const char *logtbl[] = {
     "ZwQueryInformationFile",
     "ZwCreateMutant",
     "ZwDeviceIoControlFile",
+    "ZwTerminateProcess",
+    "ZwDelayExecution",
     NULL
 };
 char logtbl_explained[sizeof(logtbl)/sizeof(char *)] = {0};

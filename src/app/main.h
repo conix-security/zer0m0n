@@ -38,6 +38,8 @@
 #include <string.h>
 #include <fltuser.h>
 
+#define NUMBER_OF_THREADS 64
+
 typedef struct _UNICODE_STRING {
   USHORT Length;
   USHORT MaximumLength;
@@ -57,9 +59,22 @@ typedef struct _KERNEL_MESSAGE
 {
 	FILTER_MESSAGE_HEADER MessageHeader;
 	char message[1024];
-} KERNEL_MESSAGE;
+	OVERLAPPED Ovlp;
+} KERNEL_MESSAGE, *PKERNEL_MESSAGE;
+
+typedef struct _THREAD_CONTEXT
+{
+	HANDLE hPort;
+	HANDLE completion;
+} THREAD_CONTEXT, *PTHREAD_CONTEXT;
 
 typedef VOID(WINAPI *RTLINITUNICODESTRING)(PUNICODE_STRING,PCWSTR);
+
 RTLINITUNICODESTRING RtlInitUnicodeString;
+CRITICAL_SECTION l_mutex;
+CRITICAL_SECTION z_mutex;
+int init;
+
+VOID parse_logs(LPVOID p);
 
 #endif
