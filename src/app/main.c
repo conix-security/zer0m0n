@@ -127,7 +127,7 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 	PWCHAR pw_pathfile = NULL;
 	LOG log;
 	THREAD_CONTEXT context;
-	int size, i, ptr_msg;
+	int size, i, j, ptr_msg;
 	int error = 0;
 	int error_len = sizeof(error);
 	DWORD outsize;
@@ -356,6 +356,13 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		}
 		if(log.arguments)
 		{
+			for(j = 0; j < log.nb_arguments; j++)
+			{
+				if(log.arguments[i].value != NULL)
+					free(log.arguments[i].value);			
+				if(log.arguments[i].arg != NULL)
+					free(log.arguments[i].arg);
+			}
 			free(log.arguments);
 			log.arguments = NULL;
 		}
