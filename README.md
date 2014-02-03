@@ -1,9 +1,20 @@
-zer0m0n v0.1
+zer0m0n v0.2
 ============
 
 zer0m0n is a driver for Cuckoo Sandbox, it will perform kernel analysis during the execution of a malware. There are many ways for a malware author to bypass Cuckoo detection, he can detect the hooks, hardcodes the Nt* functions to avoid the hooks, detect the virtual machine... The goal of this driver is to offer the possibility for the user to choose between the classical userland analysis or a kernel analysis, which will be harder to detect or bypass.
 
 Actually, it only works for XP 32 bit Windows machines, because of SSDT hooks usage ( :] ), but we plan supporting other OSes.
+
+CHANGELOG
+=========
+
+v0.2
++ added ZwDeviceIoControlFile, ZwCreateMutant, ZwDelayExecution & ZwTerminateProcess SSDT hooks
++ fixed deadlock bug (inifinte wait on FltSendMessage)
++ fixed performance issues (drop => patched using multithreading in logs_dispatcher)
+
+v0.1
++ startup version :}
 
 How it works
 ============
@@ -86,40 +97,24 @@ Q: How do you "hide" cuckoo ?
 
 A: For now, several processes are hidden/blocked, by pid filtering:
 
-    - "python.exe" (cuckoo processes)
-    - "logs_dispatcher.exe" (userland app)
+    - "python.exe" (cuckoo processes, analyzer.py / agent.py)
+    - "logs_dispatcher.exe" (userland app, randomized name)
 
-The zer0m0n driver is not hidden, the service cannot be unloaded using ZwUnloadDriver.
+The zer0m0n driver is not hidden (its name is randomized), the service cannot be unloaded using ZwUnloadDriver (MiniFIlter driver spec).
 
 Q: How do you handle the case where a malware will load a driver (and then be at the same level of your driver) and would possibly subvert the analysis ?
 
-A: Well, we can log when a new driver is loaded during the malware execution through PsSetLoadImageNotifyRoutine(), we will stop the analysis when we detect this behavior (see TODO list, again :])
+A: Well, this is in the to-do list :D. we can log when a new driver is loaded during the malware execution through PsSetLoadImageNotifyRoutine(), we planned to stop the analysis when we detect this behavior.
+
+Q: How do you handle cukoo bypassing / VM detection techniques ?
+
+A : There are really MANY ways to detect cuckoo or a virtual machine... Our thought is to handle known (and used into the wild) techniques, and to build post-analysis signatures to detect generic detection techniques and warn the user about possible detection/bypass. There must be also some ways to bypass zer0m0n and we'd want to block them all (we believe we can detect we're detected). Please try to bypass zer0m0n, this could be a really interresting cat&mouse game :]
 
 TODO LIST
 =========
 
 It's a first release, and there are still a lof of improvements to do and features to implement.
-Here is a list of such improvements to come :
-
-- anti detection features :
-    + anti-vm detection* (cuckoo & virtual machine related files/processes/registry/connections)
-    + hide threads (listing)
-- retrieve filename on ZwCreateProcess* hooks
-- handle machine poweroff
-- detect process crashes (exploits ?)
-- monitor more events / functions
-- fix file deletion race condition
-- find and fix generic bugs ;]
-- log registries callbacks return when possible
-- stop the analysis when a new driver is loaded during malware execution
-- signatures support for kernel analysis
-- win7 version (SSDT offsets / new syscalls hooks)
-- x64 version !!! clean : without SSDT hooks (:
-- etc.
-
-*: there are plenty of ways to detect cuckoo or a virtual machine, our thought is to handle known (and used) techniques, and to build
-   post-analysis signatures to detect generic detection techniques and warn the user about possible detection/bypass.
-
+You'll find a list of such improvements to come in our development branch.
 
 Authors
 =======
