@@ -108,8 +108,6 @@ VOID unhook_ssdt_entries()
 	if(oldZwCreateMutant != NULL)
 		(ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_INDEX) = oldZwCreateMutant;
 		
-<<<<<<< HEAD
-=======
 	if(oldZwDeviceIoControlFile != NULL)
 		(ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_INDEX) = oldZwDeviceIoControlFile;
 		
@@ -119,7 +117,6 @@ VOID unhook_ssdt_entries()
 	if(oldZwDelayExecution != NULL)
 		(ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_INDEX) = oldZwDelayExecution;
 		
->>>>>>> development
 	enable_cr0();
 }
 
@@ -195,8 +192,6 @@ VOID hook_ssdt_entries()
 	oldZwCreateMutant = (ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_INDEX);
 	(ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_INDEX) = newZwCreateMutant;
 	
-<<<<<<< HEAD
-=======
 	oldZwDeviceIoControlFile = (ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_INDEX);
 	(ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_INDEX) = newZwDeviceIoControlFile;
 	
@@ -206,7 +201,6 @@ VOID hook_ssdt_entries()
 	oldZwDelayExecution = (ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_INDEX);
 	(ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_INDEX) = newZwDelayExecution;
 	
->>>>>>> development
 	enable_cr0();
 }
 
@@ -2064,20 +2058,13 @@ NTSTATUS newZwQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusB
 //		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
 //	Return value :
 //		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
-<<<<<<< HEAD
-=======
 //	Process :
 //		logs mutex handle, desired access, mutex name and initial owner
->>>>>>> development
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, BOOLEAN InitialOwner)
 {
 	NTSTATUS statusCall, exceptionCode;
-<<<<<<< HEAD
-	DWORD currentProcessId;
-=======
 	ULONG currentProcessId;
->>>>>>> development
 	HANDLE kMutantHandle;
 	USHORT log_lvl = LOG_ERROR;
 	PWCHAR parameter = NULL;
@@ -2088,14 +2075,10 @@ NTSTATUS newZwCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJ
 	statusCall = ((ZWCREATEMUTANT)(oldZwCreateMutant))(MutantHandle, DesiredAccess, ObjectAttributes, InitialOwner);
 	
 	if(isProcessMonitoredByPid(currentProcessId))
-<<<<<<< HEAD
-	{
-=======
 	{	
 		#ifdef DEBUG
 		DbgPrint("call ZwCreateMutant\n");
 		#endif
->>>>>>> development
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
 		__try
@@ -2115,32 +2098,19 @@ NTSTATUS newZwCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJ
 				RtlCopyUnicodeString(&kObjectName, ObjectAttributes->ObjectName);
 			else
 			{
-<<<<<<< HEAD
-				sendLogs(currentProcessId ,L"ZwCreateMutant", L"0,-1,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,ObjectAttributes->ERROR,InitialOwner->ERROR");
-=======
 				sendLogs(currentProcessId ,L"ZwCreateMutant", L"0,-1,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,MutexName->ERROR,InitialOwner->ERROR");
->>>>>>> development
 				if(parameter)
 					ExFreePool(parameter);
 				return statusCall;
 			}
 		}
 		__except (EXCEPTION_EXECUTE_HANDLER)
-<<<<<<< HEAD
-		{
-			exceptionCode = GetExceptionCode();
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,ObjectAttributes->ERROR,InitialOwner->ERROR", exceptionCode)))
-				sendLogs(currentProcessId, L"ZwCreateMutant", parameter);
-			else 
-				sendLogs(currentProcessId ,L"ZwCreateMutant", L"0,-1,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,ObjectAttributes->ERROR,InitialOwner->ERROR");
-=======
 		{	
 			exceptionCode = GetExceptionCode();
 			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,MutexName->ERROR,InitialOwner->ERROR", exceptionCode)))
 				sendLogs(currentProcessId, L"ZwCreateMutant", parameter);
 			else 
 				sendLogs(currentProcessId ,L"ZwCreateMutant", L"0,-1,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,MutexName->ERROR,InitialOwner->ERROR");
->>>>>>> development
 			if(parameter)
 				ExFreePool(parameter);
 			if(kObjectName.Buffer)
@@ -2167,17 +2137,10 @@ NTSTATUS newZwCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJ
 				sendLogs(currentProcessId, L"ZwCreateMutant", parameter);
 			break;
 			case LOG_SUCCESS:
-<<<<<<< HEAD
-				sendLogs(currentProcessId, L"ZwCreateMutant", L"0,-1,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,ObjectAttributes->ERROR,InitialOwner->ERROR");
-			break;
-			default:
-				sendLogs(currentProcessId, L"ZwCreateMutant", L"1,0,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,ObjectAttributes->ERROR,InitialOwner->ERROR");
-=======
 				sendLogs(currentProcessId, L"ZwCreateMutant", L"0,-1,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,MutexName->ERROR,InitialOwner->ERROR");
 			break;
 			default:
 				sendLogs(currentProcessId, L"ZwCreateMutant", L"1,0,ssss,MutantHandle->ERROR,DesiredAccess->ERROR,MutexName->ERROR,InitialOwner->ERROR");
->>>>>>> development
 			break;
 		}
 		if(kObjectName.Buffer)
@@ -2190,8 +2153,6 @@ NTSTATUS newZwCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJ
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-<<<<<<< HEAD
-=======
 //  	Logs IOCTLs
 //  Parameters :
 //  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566441%28v=vs.85%29.aspx
@@ -2410,7 +2371,6 @@ NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
->>>>>>> development
 //		Unsets WP bit of CR0 register (allows writing into SSDT).
 //	Parameters :
 //		None
