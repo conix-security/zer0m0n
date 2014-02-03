@@ -60,7 +60,6 @@ int main(int argc, char **argv)
 		return -1;
 	
 	InitializeCriticalSection(&l_mutex);
-	InitializeCriticalSection(&z_mutex);
 
 	file_init();
 	
@@ -120,7 +119,6 @@ int main(int argc, char **argv)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID parse_logs(PTHREAD_CONTEXT p)
 {
-	FILE* f;
 	PKERNEL_MESSAGE msg = NULL;
 	LPOVERLAPPED pOvlp = NULL;
 	PUNICODE_STRING us_pathfile = NULL;
@@ -174,12 +172,7 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		while(msg->message[i] != 0x0A)
 			i++;
 		msg->message[i] = 0x0;
-		
-		EnterCriticalSection(&z_mutex);
-		f= fopen("C:\\a.log","a+");
-		fprintf(f,"%s\n",msg->message);
-		fclose(f);
-		LeaveCriticalSection(&z_mutex);
+	
 		// initialize pointer to the beginning of the log
 		ptr_msg = 0;
 		
@@ -190,7 +183,6 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		if(isProcessMonitoredByPid(log.pid) == -1)
 		{
 			EnterCriticalSection(&l_mutex);
-			
 			if(isProcessMonitoredByPid(log.pid) == -1)
 			{
 				if(!init)
@@ -227,8 +219,13 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 				printf("[+] New PID %d\n",log.pid);			
 			}
 			else
+			{
+				// skip process name
+				size = getsize(ptr_msg, msg->message, 0x2C);
+				ptr_msg += size+1;
 				// get socket
 				log.g_sock = getMonitoredProcessSocket(log.pid);
+			}
 			LeaveCriticalSection(&l_mutex);
 		}
 		else
@@ -249,19 +246,19 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		// retrieve success status
 		ptr_msg += size+1;
 		log.success = retrieve_int(msg->message+ptr_msg, 1);
-		
+
 		// retrieve return value
 		ptr_msg += 2;
 		size = getsize(ptr_msg, msg->message, 0x2C);
 		log.ret = retrieve_int(msg->message+ptr_msg, size);
-		
+
 		// retrieve format parameters 
 		ptr_msg += size+1;
 		size = getsize(ptr_msg, msg->message, 0x2C);
 		log.fmt = malloc(size+1);
 		log.fmt[size] = 0x0;
 		memcpy(log.fmt, msg->message+ptr_msg, size);
-		
+
 		// retrieve arguments
 		log.nb_arguments = strlen(log.fmt);
 		if(log.nb_arguments)
@@ -300,22 +297,16 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 			case 5:
 				retrieve_parameters(log.nb_arguments, msg->message, ptr_msg, size, log.arguments);
 				i = log_resolve_index(log.funcname, 0);
-				if(log.g_sock == -1)
-					printf("WTF\n");
 				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value);
 			
 			case 6:
 				retrieve_parameters(log.nb_arguments, msg->message, ptr_msg, size, log.arguments);
 				i = log_resolve_index(log.funcname, 0);
-				if(log.g_sock == -1)
-					printf("WTF\n");
 				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value,log.arguments[5].arg,log.arguments[5].value);
 			
 			case 7:
 				retrieve_parameters(log.nb_arguments, msg->message, ptr_msg, size, log.arguments);
 				i = log_resolve_index(log.funcname, 0);
-				if(log.g_sock == -1)
-					printf("WTF\n");
 				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value,log.arguments[5].arg,log.arguments[5].value,log.arguments[6].arg,log.arguments[6].value);
 		
 			default:
@@ -358,14 +349,15 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		{
 			for(j = 0; j < log.nb_arguments; j++)
 			{
-				if(log.arguments[i].value != NULL)
-					free(log.arguments[i].value);			
-				if(log.arguments[i].arg != NULL)
-					free(log.arguments[i].arg);
+				if(log.arguments[j].value != NULL)
+					free(log.arguments[j].value);			
+				if(log.arguments[j].arg != NULL)
+					free(log.arguments[j].arg);
 			}
 			free(log.arguments);
 			log.arguments = NULL;
 		}
+		memset(msg, 0, sizeof(KERNEL_MESSAGE));
 	}
 	free(msg);
 }

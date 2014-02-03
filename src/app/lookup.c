@@ -59,7 +59,6 @@ void *lookup_get(lookup_t *d, unsigned int id, unsigned int *size)
 {
 	void *data;
 	entry_t *p = d->root;
-	printf("lookup_get()\n");
 	ENTER();
 	for (p; p != NULL; p = p->next) {
         if(p->id == id) {

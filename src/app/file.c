@@ -55,17 +55,13 @@ void file_write(HANDLE file_handle)
         // we do in fact want to dump this file because it was written to
         new_file(&str);
 
-		printf("apres new_file()\n");
         // delete the file record from the list
         lookup_del(&g_files, (unsigned int) file_handle);
     }
-	else
-		printf("lookup_get() failed !\n");
 }
 
 void handle_new_file(HANDLE file_handle, OBJECT_ATTRIBUTES *obj)
 {
-	printf("handle_new_file() !\n");
     if(is_directory_objattr(obj) == 0 && is_ignored_file_objattr(obj) == 0) {
 
         wchar_t fname[MAX_PATH]; int length;
@@ -73,7 +69,6 @@ void handle_new_file(HANDLE file_handle, OBJECT_ATTRIBUTES *obj)
 
         length = ensure_absolute_path(fname, fname, length);
 
-		printf("cache_file will be called\n");
         // cache this file
         cache_file(file_handle, fname, length, obj->Attributes);
     }
