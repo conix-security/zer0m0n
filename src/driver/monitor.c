@@ -59,7 +59,9 @@ NTSTATUS startMonitoringProcess(ULONG new_pid)
 	new_entry->pid = new_pid;
 	new_entry->flink = monitored_process_list;
 	monitored_process_list = new_entry;
-	
+	#ifdef DEBUG
+	DbgPrint("New PID : %d\n",new_pid);
+	#endif
 	return STATUS_SUCCESS;
 }
 

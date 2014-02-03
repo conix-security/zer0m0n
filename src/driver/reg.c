@@ -167,10 +167,10 @@ NTSTATUS regCallback (PVOID CallbackContext, PVOID Argument1, PVOID Argument2)
 				if(NT_SUCCESS(RtlStringCchPrintfW(pwBuf, MAXSIZE, L"1,0,ss,SubKey->%wZ,ValueName->%wZ", tmp, ((PREG_QUERY_VALUE_KEY_INFORMATION)Argument2)->ValueName)))
 					sendLogs(pid, L"REGISTRY_QUERY_VALUE_KEY", pwBuf);	
 				else
-					sendLogs(pid, L"REGISTRY_QUERY_VALUE_KEY", L"1,0,s,SubKey->ERROR");
+					sendLogs(pid, L"REGISTRY_QUERY_VALUE_KEY", L"1,0,ss,SubKey->ERROR,ValueName->ERROR");
 			}
 			else
-				sendLogs(pid, L"REGISTRY_QUERY_VALUE_KEY", L"1,0,s,SubKey->ERROR");
+				sendLogs(pid, L"REGISTRY_QUERY_VALUE_KEY", L"1,0,ss,SubKey->ERROR,ValueName->ERROR");
 		break;
 		
 		case RegNtPreCreateKey:

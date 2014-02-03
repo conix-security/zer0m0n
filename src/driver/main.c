@@ -131,6 +131,12 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	oldZwSetInformationFile = NULL;
 	oldZwQueryInformationFile = NULL;
 	oldZwCreateMutant = NULL;
+<<<<<<< HEAD
+=======
+	oldZwDeviceIoControlFile = NULL;
+	oldZwTerminateProcess = NULL;
+	oldZwDelayExecution = NULL;
+>>>>>>> development
 	
    	status = FltRegisterFilter(pDriverObject,&registration,&filter);
 	if(!NT_SUCCESS(status))

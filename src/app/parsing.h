@@ -93,6 +93,4 @@ int retrieve_int(char *log, int size);
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void retrieve_parameters(int nb_arguments, char *message, int ptr_msg, int size, PARAMETERS* tmp);
 
-PARAMETERS *tmp;
-
 #endif
