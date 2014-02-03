@@ -2,6 +2,7 @@ zer0m0n v0.2 (DEVELOPMENT BRANCH)
 =================================
 
 To-do :
++ Cr0 reg trick => multiprocessor issues.
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
 + Handle SSDT hooks race conditions (perform legitimate calls with copied parameters)
 + Handle ZwTerminateProcess race condition (notify analyzer.py of process termination)
