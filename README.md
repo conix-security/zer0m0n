@@ -21,6 +21,7 @@ To-do :
 
 v0.3 changes :
 + fix ZwTerminateProcess race condition (notify analyzer.py of process termination)
++ fix hook ZwDelayExecution => log the call before executing it
 
 v0.2 changes :
 + ZwDeviceIoControlFile hook
