@@ -120,16 +120,17 @@ int pipe(const char *fmt, ...)
 	int len;
 	va_list args;
 	char *buf;
+
     va_start(args, fmt);
     len = _pipe_sprintf(NULL, fmt, args);
     if(len > 0) {
 		buf = malloc(len+1);
         _pipe_sprintf(buf, fmt, args);
         va_end(args);
-        return CallNamedPipe(g_pipe_name, buf, len, buf, len,
+		return CallNamedPipe(g_pipe_name, buf, len, buf, len,
 			(unsigned long *) &len, NMPWAIT_WAIT_FOREVER);
 		free(buf);
-    }
+	}
     return -1;
 }
 

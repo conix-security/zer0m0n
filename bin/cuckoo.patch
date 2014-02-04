@@ -1,6 +1,6 @@
 diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.py
 --- original/analyzer/windows/analyzer.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/analyzer.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/analyzer.py	2014-02-04 18:19:59.770300681 +0100
 @@ -64,6 +64,12 @@ def add_pid(pid):
          log.info("Added new process to list with pid: %s", pid)
          PROCESS_LIST.append(pid)
@@ -58,7 +58,7 @@ diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.p
  
          while True:
              time_counter += 1
-@@ -630,10 +666,11 @@ class Analyzer:
+@@ -630,17 +666,20 @@ class Analyzer:
                  # If the process monitor is enabled we start checking whether
                  # the monitored processes are still alive.
                  if pid_check:
@@ -74,9 +74,21 @@ diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.p
  
                      # If none of the monitored processes are still alive, we
                      # can terminate the analysis.
+                     if len(PROCESS_LIST) == 0:
+-                        log.info("Process list is empty, "
+-                                 "terminating analysis...")
+-                        break
++                       KERNEL32.Sleep(1000)
++                       if len(PROCESS_LIST) == 0:
++                            log.info("Process list is empty, "
++                                     "terminating analysis...")
++                            break
+ 
+                     # Update the list of monitored processes available to the
+                     # analysis package. It could be used for internal
 diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib/api/process.py
 --- original/analyzer/windows/lib/api/process.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/lib/api/process.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/lib/api/process.py	2014-02-04 18:19:59.773634015 +0100
 @@ -5,6 +5,8 @@
  import os
  import logging
@@ -211,7 +223,7 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
      def wait(self):
 diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/windows/modules/packages/applet.py
 --- original/analyzer/windows/modules/packages/applet.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/applet.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/applet.py	2014-02-04 18:19:59.773634015 +0100
 @@ -50,6 +50,9 @@ class Applet(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -239,7 +251,7 @@ diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/win
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/windows/modules/packages/bin.py
 --- original/analyzer/windows/modules/packages/bin.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/bin.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/bin.py	2014-02-04 18:19:59.773634015 +0100
 @@ -11,8 +11,12 @@ class Shellcode(Package):
      def start(self, path):
          p = Process()
@@ -257,7 +269,7 @@ diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/window
          return p.pid
 diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/windows/modules/packages/cpl.py
 --- original/analyzer/windows/modules/packages/cpl.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/cpl.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/cpl.py	2014-02-04 18:19:59.773634015 +0100
 @@ -26,18 +26,22 @@ class CPL(Package):
  
          dll = self.options.get("dll", None)
@@ -285,7 +297,7 @@ diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/windows/modules/packages/dll.py
 --- original/analyzer/windows/modules/packages/dll.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/dll.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/dll.py	2014-02-04 18:19:59.773634015 +0100
 @@ -14,6 +14,9 @@ class Dll(Package):
          function = self.options.get("function", "DllMain")
          arguments = self.options.get("arguments", None)
@@ -314,7 +326,7 @@ diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/windows/modules/packages/doc.py
 --- original/analyzer/windows/modules/packages/doc.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/doc.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/doc.py	2014-02-04 18:19:59.773634015 +0100
 @@ -37,17 +37,22 @@ class DOC(Package):
  
          dll = self.options.get("dll", None)
@@ -342,7 +354,7 @@ diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/windows/modules/packages/exe.py
 --- original/analyzer/windows/modules/packages/exe.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/exe.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/exe.py	2014-02-04 18:19:59.773634015 +0100
 @@ -13,17 +13,21 @@ class Exe(Package):
          free = self.options.get("free", False)
          args = self.options.get("arguments", None)
@@ -369,7 +381,7 @@ diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/window
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/windows/modules/packages/generic.py
 --- original/analyzer/windows/modules/packages/generic.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/generic.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/generic.py	2014-02-04 18:19:59.773634015 +0100
 @@ -14,6 +14,9 @@ class Genric(Package):
      def start(self, path):
          free = self.options.get("free", False)
@@ -398,7 +410,7 @@ diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/wi
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windows/modules/packages/html.py
 --- original/analyzer/windows/modules/packages/html.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/html.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/html.py	2014-02-04 18:19:59.773634015 +0100
 @@ -14,6 +14,9 @@ class HTML(Package):
      def start(self, path):
          free = self.options.get("free", False)
@@ -427,7 +439,7 @@ diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windo
          else:
 diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows/modules/packages/ie.py
 --- original/analyzer/windows/modules/packages/ie.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/ie.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/ie.py	2014-02-04 18:19:59.773634015 +0100
 @@ -15,6 +15,9 @@ class IE(Package):
      def start(self, url):
          free = self.options.get("free", False)
@@ -456,7 +468,7 @@ diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows
          else:
 diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/windows/modules/packages/jar.py
 --- original/analyzer/windows/modules/packages/jar.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/jar.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/jar.py	2014-02-04 18:19:59.773634015 +0100
 @@ -33,6 +33,9 @@ class Jar(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -485,7 +497,7 @@ diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/windows/modules/packages/pdf.py
 --- original/analyzer/windows/modules/packages/pdf.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/pdf.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/pdf.py	2014-02-04 18:19:59.773634015 +0100
 @@ -34,17 +34,21 @@ class PDF(Package):
  
          dll = self.options.get("dll", None)
@@ -512,7 +524,7 @@ diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/windows/modules/packages/vbs.py
 --- original/analyzer/windows/modules/packages/vbs.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/vbs.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/vbs.py	2014-02-04 18:19:59.773634015 +0100
 @@ -33,17 +33,21 @@ class VBS(Package):
  
          dll = self.options.get("dll", None)
@@ -539,7 +551,7 @@ diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/windows/modules/packages/xls.py
 --- original/analyzer/windows/modules/packages/xls.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/xls.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/xls.py	2014-02-04 18:19:59.773634015 +0100
 @@ -36,17 +36,21 @@ class XLS(Package):
  
          dll = self.options.get("dll", None)
@@ -566,7 +578,7 @@ diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/windows/modules/packages/zip.py
 --- original/analyzer/windows/modules/packages/zip.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/zip.py	2014-02-04 15:06:03.453458628 +0100
++++ new/analyzer/windows/modules/packages/zip.py	2014-02-04 18:19:59.773634015 +0100
 @@ -43,17 +43,21 @@ class Zip(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -593,7 +605,7 @@ diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/window
          else:
 diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
 --- original/lib/cuckoo/common/logtbl.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/lib/cuckoo/common/logtbl.py	2014-02-04 15:06:03.640125298 +0100
++++ new/lib/cuckoo/common/logtbl.py	2014-02-04 18:19:59.780300680 +0100
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
 +	# Copyright (C) 2010-2013 Cuckoo Sandbox Developers.
@@ -641,7 +653,7 @@ diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
  ]
 diff -rupN original/lib/cuckoo/core/database.py new/lib/cuckoo/core/database.py
 --- original/lib/cuckoo/core/database.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/lib/cuckoo/core/database.py	2014-02-04 15:06:03.630125297 +0100
++++ new/lib/cuckoo/core/database.py	2014-02-04 18:19:59.780300680 +0100
 @@ -271,6 +271,7 @@ class Task(Base):
      target = Column(Text(), nullable=False)
      category = Column(String(255), nullable=False)
@@ -735,7 +747,7 @@ diff -rupN original/lib/cuckoo/core/database.py new/lib/cuckoo/core/database.py
                     task.machine,
 diff -rupN original/modules/processing/behavior.py new/modules/processing/behavior.py
 --- original/modules/processing/behavior.py	2014-01-09 15:47:55.000000000 +0100
-+++ new/modules/processing/behavior.py	2014-02-04 15:06:03.543458629 +0100
++++ new/modules/processing/behavior.py	2014-02-04 18:19:59.776967348 +0100
 @@ -329,6 +329,20 @@ class Summary:
              name = self._check_registry(registry, subkey, handle)
              if name and name not in self.keys:
@@ -759,7 +771,7 @@ diff -rupN original/modules/processing/behavior.py new/modules/processing/behavi
              subkey = ""
 diff -rupN original/web/submission/views.py new/web/submission/views.py
 --- original/web/submission/views.py	2014-01-09 15:47:49.000000000 +0100
-+++ new/web/submission/views.py	2014-02-04 15:06:06.176792002 +0100
++++ new/web/submission/views.py	2014-02-04 18:19:59.780300680 +0100
 @@ -26,6 +26,7 @@ def index(request):
          package = request.POST.get("package", "")
          timeout = force_int(request.POST.get("timeout"))
@@ -798,7 +810,7 @@ diff -rupN original/web/submission/views.py new/web/submission/views.py
                                   custom=custom,
 diff -rupN original/web/templates/submission/index.html new/web/templates/submission/index.html
 --- original/web/templates/submission/index.html	2014-01-09 15:47:49.000000000 +0100
-+++ new/web/templates/submission/index.html	2014-02-04 15:06:05.773458663 +0100
++++ new/web/templates/submission/index.html	2014-02-04 18:19:59.780300680 +0100
 @@ -101,6 +101,15 @@ $(document).ready( function() {
                                  <label for="form_options">Options</label>
                                  <input type="text" class="form-control" id="form_options" name="options" />
