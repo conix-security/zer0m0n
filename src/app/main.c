@@ -330,6 +330,16 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		{
 			//pipe("FILE_DEL:%s", log.arguments[0].value);
 		}
+
+		// notifies analyzer.py that a process has terminated
+		if(!strcmp(log.funcname, "ZwTerminateProcess") && !log.ret)
+		{
+
+			printf("KTERMINATE:%d\n", atoi(log.arguments[1].value));			
+			pipe("KTERMINATE:%d", atoi(log.arguments[1].value));
+			
+		}
+
 		if(log.procname)
 		{
 			free(log.procname);

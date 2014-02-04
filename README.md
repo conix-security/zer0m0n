@@ -1,11 +1,10 @@
-zer0m0n v0.2 (DEVELOPMENT BRANCH)
+zer0m0n v0.3 (DEVELOPMENT BRANCH)
 =================================
 
 To-do :
 + Cr0 reg trick => multiprocessor issues.
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
 + Handle SSDT hooks race conditions (perform legitimate calls with copied parameters)
-+ Handle ZwTerminateProcess race condition (notify analyzer.py of process termination)
 + Add anti-detection features (cuckoo / VM files/process/reg/connections)
 + Hide thread listing
 + Get ZwCreateProcess* filename parameter
@@ -19,6 +18,9 @@ To-do :
 + win7 x86 support
 + x64 support (get rid of SSDT hooks)
 + etc.
+
+v0.3 changes :
++ fix ZwTerminateProcess race condition (notify analyzer.py of process termination)
 
 v0.2 changes :
 + ZwDeviceIoControlFile hook
