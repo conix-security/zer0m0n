@@ -2300,7 +2300,7 @@ NTSTATUS newZwTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval)
 {
-	NTSTATUS statusCall, exceptionCode;
+	NTSTATUS exceptionCode;
 	ULONG currentProcessId;
 	ULONG ms;
 	USHORT log_lvl = LOG_ERROR;
@@ -2308,8 +2308,7 @@ NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval)
 	LARGE_INTEGER kDelayInterval;
 	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
-	statusCall = ((ZWDELAYEXECUTION)(oldZwDelayExecution))(Alertable, DelayInterval);
-	
+
 	if(isProcessMonitoredByPid(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
@@ -2332,41 +2331,18 @@ NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval)
 			else
 				sendLogs(currentProcessId, L"ZwDelayExecution", L"0,-1,s,DelayInterval->ERROR");
 			ExFreePool(parameter);
-			return statusCall;
+			return ((ZWDELAYEXECUTION)(oldZwDelayExecution))(Alertable, DelayInterval);
 		}
 		
 		ms = (ULONG)(-kDelayInterval.QuadPart / 10000);
 		
-		if(NT_SUCCESS(statusCall))
-		{
-			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,s,DelayInterval->%d", ms)))
-				log_lvl = LOG_PARAM;
-		}
-		else
-		{
-			log_lvl = LOG_ERROR;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,DelayInterval->%d", statusCall, ms)))
-				log_lvl = LOG_PARAM;
-		}
-		switch(log_lvl)
-		{
-			case LOG_PARAM:
-				sendLogs(currentProcessId, L"ZwDelayExecution", parameter);
-			break;
-				
-			case LOG_SUCCESS:
-				sendLogs(currentProcessId, L"ZwDelayExecution", L"0,-1,s,DelayInterval->ERROR");
-			break;
-				
-			default:
-				sendLogs(currentProcessId, L"ZwDelayExecution", L"1,0,s,DelayInterval->ERROR");
-			break;
-		}
+		if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,s,DelayInterval->%d", ms)))
+			sendLogs(currentProcessId, L"ZwDelayExecution", parameter);
+			
 		if(parameter)
 				ExFreePool(parameter);
 	}
-	return statusCall;
+	return ((ZWDELAYEXECUTION)(oldZwDelayExecution))(Alertable, DelayInterval);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
