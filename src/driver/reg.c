@@ -216,6 +216,13 @@ NTSTATUS regCallback (PVOID CallbackContext, PVOID Argument1, PVOID Argument2)
 		case RegNtPreOpenKey:
 			if(((PREG_PRE_OPEN_KEY_INFORMATION)Argument2)->CompleteName->Buffer != NULL)
 			{
+				if(!_wcsicmp(((PREG_PRE_OPEN_KEY_INFORMATION)Argument2)->CompleteName->Buffer, L"SOFTWARE\\Oracle\\VirtualBox Guest Additions"))
+				{
+					if(NT_SUCCESS(RtlStringCchPrintfW(pwBuf, MAXSIZE, L"0,0,s,SubKey->%wZ", ((PREG_PRE_OPEN_KEY_INFORMATION)Argument2)->CompleteName)))
+						sendLogs(pid,L"REGISTRY_OPEN_KEY", pwBuf);
+					return STATUS_OBJECT_NAME_NOT_FOUND;
+				}
+				
 				if(NT_SUCCESS(RtlStringCchPrintfW(pwBuf, MAXSIZE, L"1,0,s,SubKey->%wZ", ((PREG_PRE_OPEN_KEY_INFORMATION)Argument2)->CompleteName)))
 					sendLogs(pid,L"REGISTRY_OPEN_KEY", pwBuf);
 				else

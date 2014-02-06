@@ -68,13 +68,9 @@
 #define DEVICEIOCONTROLFILE_INDEX 0x42
 #define TERMINATEPROCESS_INDEX 0x101
 #define DELAYEXECUTION_INDEX 0x3B
+#define QUERYVALUEKEY_INDEX 0xB1
+#define QUERYATTRIBUTESFILE_INDEX 0x8B
 
-/////////////////////////////////////////////////////////////////////////////		
-// STRUCTS
-/////////////////////////////////////////////////////////////////////////////
-
-// SSDT entry struct
-#pragma pack(1)
 typedef struct _ServiceDescriptorEntry {
      unsigned int *ServiceTableBase;
      unsigned int *ServiceCounterTableBase;
@@ -204,6 +200,8 @@ typedef NTSTATUS(*ZWCREATEMUTANT)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, BOOL
 typedef NTSTATUS(*ZWDEVICEIOCONTROLFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, ULONG, PVOID, ULONG, PVOID, ULONG);
 typedef NTSTATUS(*ZWTERMINATEPROCESS)(HANDLE, NTSTATUS);
 typedef NTSTATUS(*ZWDELAYEXECUTION)(BOOLEAN, PLARGE_INTEGER);
+typedef NTSTATUS(*ZWQUERYVALUEKEY)(HANDLE, PUNICODE_STRING, KEY_VALUE_INFORMATION_CLASS, PVOID, ULONG, PULONG);
+typedef NTSTATUS(*ZWQUERYATTRIBUTESFILE)(POBJECT_ATTRIBUTES, PFILE_BASIC_INFORMATION);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
@@ -232,6 +230,8 @@ ZWCREATEMUTANT oldZwCreateMutant;
 ZWDEVICEIOCONTROLFILE oldZwDeviceIoControlFile;
 ZWTERMINATEPROCESS oldZwTerminateProcess;
 ZWDELAYEXECUTION oldZwDelayExecution;
+ZWQUERYVALUEKEY oldZwQueryValueKey;
+ZWQUERYATTRIBUTESFILE oldZwQueryAttributesFile;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
@@ -501,5 +501,25 @@ NTSTATUS newZwTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus);
 //  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtDelayExecution.html
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Hide VBOX keys.
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwQueryValueKey(HANDLE KeyHandle, PUNICODE_STRING ValueName, KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass, PVOID KeyValueInformation, ULONG Length, PULONG ResultLength);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Hide VBOX files
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwQueryAttributesFile(POBJECT_ATTRIBUTES ObjectAttributes, PFILE_BASIC_INFORMATION FileInformation);
 
 #endif

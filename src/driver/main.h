@@ -47,7 +47,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 // Uncomment to enable kernel debugging output
-#define DEBUG
+//#define DEBUG
 
 // Memory tags
 #define PROC_POOL_TAG 		'prcT'

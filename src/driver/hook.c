@@ -117,6 +117,12 @@ VOID unhook_ssdt_entries()
 	if(oldZwDelayExecution != NULL)
 		(ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_INDEX) = oldZwDelayExecution;
 		
+	if(oldZwQueryValueKey != NULL)
+		(ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_INDEX) = oldZwQueryValueKey;
+		
+	if(oldZwQueryAttributesFile != NULL)
+		(ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX) = oldZwQueryAttributesFile;
+		
 	enable_cr0();
 }
 
@@ -200,6 +206,12 @@ VOID hook_ssdt_entries()
 	
 	oldZwDelayExecution = (ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_INDEX);
 	(ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_INDEX) = newZwDelayExecution;
+	
+	oldZwQueryValueKey = (ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_INDEX);
+	(ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_INDEX) = newZwQueryValueKey;
+	
+	oldZwQueryAttributesFile = (ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX);
+	(ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX) = newZwQueryAttributesFile;
 	
 	enable_cr0();
 }
@@ -2303,7 +2315,6 @@ NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval)
 	NTSTATUS exceptionCode;
 	ULONG currentProcessId;
 	ULONG ms;
-	USHORT log_lvl = LOG_ERROR;
 	PWCHAR parameter = NULL;
 	LARGE_INTEGER kDelayInterval;
 	
@@ -2343,6 +2354,182 @@ NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval)
 				ExFreePool(parameter);
 	}
 	return ((ZWDELAYEXECUTION)(oldZwDelayExecution))(Alertable, DelayInterval);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Hide VBOX keys.
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
+//	Process :
+//		if a malware tries to identify VirtualBox by querying the key "Identifier", "SystemBiosVersion" 
+//		or "VideoBiosVersion"
+//		for "HKLM\HARDWARE\\DEVICEMAP\\Scsi\\Scsi Port 0\\Scsi Bus 0\\Target Id 0\\Logical Unit Id 0"
+// 		and "HKLM\\HARDWARE\\Description\\System", we return fake informations
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwQueryValueKey(HANDLE KeyHandle, PUNICODE_STRING ValueName, KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass, PVOID KeyValueInformation, ULONG Length, PULONG ResultLength)
+{
+	NTSTATUS statusCall, status;
+	ULONG currentProcessId, len;
+	ULONG sizeNeeded = 0;
+	PKEY_NAME_INFORMATION nameInfo = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	
+	statusCall = ((ZWQUERYVALUEKEY)(oldZwQueryValueKey))(KeyHandle, ValueName, KeyValueInformationClass, KeyValueInformation, Length, ResultLength);
+		
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		#ifdef DEBUG
+		DbgPrint("call ZwQueryValueKey\n");
+		#endif
+		
+		if(NT_SUCCESS(statusCall))
+		{
+			if(ValueName->Buffer)
+			{			
+				ZwQueryKey(KeyHandle, KeyNameInformation, NULL, 0, &sizeNeeded);
+				nameInfo = ExAllocatePoolWithTag(NonPagedPool, sizeNeeded*sizeof(WCHAR), PROC_POOL_TAG);
+				if(!nameInfo)
+					return statusCall;
+				RtlZeroMemory(nameInfo, sizeNeeded*sizeof(WCHAR));
+				status = ZwQueryKey(KeyHandle, KeyNameInformation, nameInfo, sizeNeeded*sizeof(WCHAR), &len);
+				if(!NT_SUCCESS(status))
+					return statusCall;
+									
+				if(!_wcsicmp(nameInfo->Name, L"\\REGISTRY\\MACHINE\\HARDWARE\\DEVICEMAP\\Scsi\\Scsi Port 0\\Scsi Bus 0\\Target Id 0\\Logical Unit Id 0"))
+				{						   
+					if(!_wcsicmp(ValueName->Buffer, L"Identifier"))
+					{
+						len = wcslen(L"ST38001A");
+						if(KeyValueInformation && RtlStringCchPrintfW(((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Name, len, L"ST38001A"))
+						{
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Type = 1;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->TitleIndex = 0;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->NameLength = len;
+						}
+					}
+				}
+				else if(!_wcsicmp(nameInfo->Name, L"\\REGISTRY\\MACHINE\\HARDWARE\\DESCRIPTION\\System"))
+				{
+					if(!_wcsicmp(ValueName->Buffer, L"SystemBiosVersion"))
+					{
+						len = wcslen(L"DELL   - 15 Phoenix ROM BIOS PLUS Version 1.10 A07");
+						if(KeyValueInformation && RtlStringCchPrintfW(((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Name, len, L"DELL   - 15 Phoenix ROM BIOS PLUS Version 1.10 A07"))
+						{
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Type = 7;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->TitleIndex = 0;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->NameLength = len;
+						}
+					}
+					else if(!_wcsicmp(ValueName->Buffer, L"VideoBiosVersion"))
+					{
+						len = wcslen(L"Hardware Version 1.0");
+						if(KeyValueInformation && RtlStringCchPrintfW(((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Name, len, L"Hardware Version 1.0"))
+						{
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Type = 7;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->TitleIndex = 0;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->NameLength = len;
+						}
+					}
+				}
+				if(nameInfo)
+					ExFreePool(nameInfo);
+			}
+		}
+	}
+	return statusCall;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Hide VBOX files
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
+//	Process :
+//		if a malware tries to identify VirtualBox by trying to get attributes of vbox files, we return
+//		INVALID_FILE_ATTRIBUTES.
+//		we only log when there is an attempt to detect VirtualBox
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwQueryAttributesFile(POBJECT_ATTRIBUTES ObjectAttributes, PFILE_BASIC_INFORMATION FileInformation)
+{
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId;
+	PWCHAR parameter = NULL;
+	UNICODE_STRING kObjectName;
+	
+	kObjectName.Buffer = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	statusCall = ((ZWQUERYATTRIBUTESFILE)(oldZwQueryAttributesFile))(ObjectAttributes, FileInformation);
+
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		
+		#ifdef DEBUG
+		DbgPrint("call ZwQueryAttributesFile\n");
+		#endif
+		
+		if(NT_SUCCESS(statusCall))
+		{
+			__try
+			{
+				if(ExGetPreviousMode() != KernelMode)
+				{
+					ProbeForRead(ObjectAttributes, sizeof(OBJECT_ATTRIBUTES), 1);
+					ProbeForRead(ObjectAttributes->ObjectName, sizeof(UNICODE_STRING), 1);
+					ProbeForRead(ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length, 1);	
+				}
+				kObjectName.Length = ObjectAttributes->ObjectName->Length;
+				kObjectName.MaximumLength = ObjectAttributes->ObjectName->Length;
+				kObjectName.Buffer = ExAllocatePoolWithTag(NonPagedPool, kObjectName.MaximumLength, BUFFER_TAG);
+				if(!kObjectName.Buffer)
+				{
+					if(parameter)
+						ExFreePool(parameter);
+					sendLogs(currentProcessId, L"ZwQueryAttributesFile", L"0,-1,s,FileName->ERROR");
+					return statusCall;
+				}
+				RtlCopyUnicodeString(&kObjectName, ObjectAttributes->ObjectName);
+			}
+			__except (EXCEPTION_EXECUTE_HANDLER)
+			{
+				exceptionCode = GetExceptionCode();
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,FileName->ERROR", exceptionCode)))
+					sendLogs(currentProcessId, L"ZwQueryAttributesFile", parameter);
+				else 
+					sendLogs(currentProcessId, L"ZwQueryAttributesFile", L"0,-1,s,FileName->ERROR");
+				if(parameter)
+					ExFreePool(parameter);
+				if(kObjectName.Buffer)
+					ExFreePool(kObjectName.Buffer);
+				return statusCall;
+			}
+			
+			if(!_wcsicmp(kObjectName.Buffer, L"\\??\\C:\\Windows\\system32\\drivers\\VBoxMouse.sys"))
+			{
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,-1,s,FileName->%ws", kObjectName.Buffer)))
+					sendLogs(currentProcessId, L"ZwQueryAttributesFile", parameter);
+				else 
+					sendLogs(currentProcessId, L"ZwQueryAttributesFile", L"0,-1,s,FileName->ERROR");
+				if(parameter)
+					ExFreePool(parameter);
+				if(kObjectName.Buffer)
+					ExFreePool(kObjectName.Buffer);
+				return -1; // INVALID_FILE_ATTRIBUTES
+			}	
+			if(kObjectName.Buffer)
+				ExFreePool(parameter);
+		}
+		if(parameter)
+			ExFreePool(parameter);
+	}		
+	return statusCall;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
