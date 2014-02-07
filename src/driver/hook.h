@@ -70,6 +70,8 @@
 #define DELAYEXECUTION_INDEX 0x3B
 #define QUERYVALUEKEY_INDEX 0xB1
 #define QUERYATTRIBUTESFILE_INDEX 0x8B
+#define READVIRTUALMEMORY_INDEX 0xBA
+#define RESUMETHREAD_INDEX 0xC
 
 typedef struct _ServiceDescriptorEntry {
      unsigned int *ServiceTableBase;
@@ -202,6 +204,8 @@ typedef NTSTATUS(*ZWTERMINATEPROCESS)(HANDLE, NTSTATUS);
 typedef NTSTATUS(*ZWDELAYEXECUTION)(BOOLEAN, PLARGE_INTEGER);
 typedef NTSTATUS(*ZWQUERYVALUEKEY)(HANDLE, PUNICODE_STRING, KEY_VALUE_INFORMATION_CLASS, PVOID, ULONG, PULONG);
 typedef NTSTATUS(*ZWQUERYATTRIBUTESFILE)(POBJECT_ATTRIBUTES, PFILE_BASIC_INFORMATION);
+typedef NTSTATUS(*ZWREADVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
+typedef NTSTATUS(*ZWRESUMETHREAD)(HANDLE, PULONG);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
@@ -232,6 +236,8 @@ ZWTERMINATEPROCESS oldZwTerminateProcess;
 ZWDELAYEXECUTION oldZwDelayExecution;
 ZWQUERYVALUEKEY oldZwQueryValueKey;
 ZWQUERYATTRIBUTESFILE oldZwQueryAttributesFile;
+ZWREADVIRTUALMEMORY oldZwReadVirtualMemory;
+ZWRESUMETHREAD oldZwResumeThread;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
@@ -521,5 +527,25 @@ NTSTATUS newZwQueryValueKey(HANDLE KeyHandle, PUNICODE_STRING ValueName, KEY_VAL
 //  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwQueryAttributesFile(POBJECT_ATTRIBUTES ObjectAttributes, PFILE_BASIC_INFORMATION FileInformation);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs virtual memory read.
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Logs resume thread
+//  Parameters :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
+//  Return value :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwResumeThread(HANDLE ThreadHandle, PULONG SuspendCount);
 
 #endif

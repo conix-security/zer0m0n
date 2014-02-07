@@ -123,6 +123,12 @@ VOID unhook_ssdt_entries()
 	if(oldZwQueryAttributesFile != NULL)
 		(ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX) = oldZwQueryAttributesFile;
 		
+	if(oldZwReadVirtualMemory != NULL)
+		(ZWREADVIRTUALMEMORY)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX) = oldZwReadVirtualMemory;
+		
+	if(oldZwResumeThread != NULL)
+		(ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_INDEX) = oldZwResumeThread;
+		
 	enable_cr0();
 }
 
@@ -212,6 +218,12 @@ VOID hook_ssdt_entries()
 	
 	oldZwQueryAttributesFile = (ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX);
 	(ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX) = newZwQueryAttributesFile;
+	
+	oldZwReadVirtualMemory = (ZWREADVIRTUALMEMORY)SYSTEMSERVICE(READVIRTUALMEMORY_INDEX);
+	(ZWREADVIRTUALMEMORY)SYSTEMSERVICE(READVIRTUALMEMORY_INDEX) = newZwReadVirtualMemory;
+	
+	oldZwResumeThread = (ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_INDEX);
+	(ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_INDEX) = newZwResumeThread;
 	
 	enable_cr0();
 }
@@ -654,6 +666,66 @@ NTSTATUS newZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationC
 			ExFreePool(parameter);
 	}
 	
+	return statusCall;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs virtual memory read.
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
+//	Process :
+//		logs the BaseAddress, ProcessHandle, NumberOfBytesToRead and NumberOfBytesReaded parameters.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded)
+{
+	NTSTATUS statusCall;
+	ULONG currentProcessId, targetProcessId;
+	ULONG log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	statusCall = ((ZWREADVIRTUALMEMORY)(oldZwReadVirtualMemory))(ProcessHandle, BaseAddress, Buffer, NumberOfBytesToRead, NumberOfBytesReaded);
+	
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		#ifdef DEBUG
+		DbgPrint("call ZwWriteVirtualMemory\n");
+		#endif
+		
+		targetProcessId = getPIDByHandle(ProcessHandle);
+		
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		if(NT_SUCCESS(statusCall))
+		{
+			log_lvl = LOG_SUCCESS;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,NumberOfBytesToRead->%d", ProcessHandle, targetProcessId, BaseAddress, NumberOfBytesToRead)))
+				log_lvl = LOG_PARAM;
+		}
+		else
+		{
+			log_lvl = LOG_ERROR;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,NumberOfBytesToRead->%d", statusCall, ProcessHandle, targetProcessId, BaseAddress, NumberOfBytesToRead)))
+				log_lvl = LOG_PARAM;
+		}
+		
+		switch(log_lvl)
+		{
+			case LOG_PARAM:
+				sendLogs(currentProcessId, L"ZwReadVirtualMemory", parameter);
+			break;
+			case LOG_SUCCESS:
+				sendLogs(currentProcessId, L"ZwReadVirtualMemory", L"0,1,ssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,NumberOfBytesToRead->ERROR");
+			break;
+			default:
+				sendLogs(currentProcessId, L"ZwReadVirtualMemory", L"1,0,ssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,NumberOfBytesToRead->ERROR");
+			break;
+		}
+		if(parameter != NULL)
+			ExFreePool(parameter);
+	}
 	return statusCall;
 }
 
@@ -2302,6 +2374,85 @@ NTSTATUS newZwTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  Description :
+//  	Logs resume thread
+//  Parameters :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
+//  Return value :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
+//	Process :
+//		logs thread handle and SuspendCount
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwResumeThread(HANDLE ThreadHandle, PULONG SuspendCount)
+{
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, kSuspendCount;
+	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	
+	statusCall = ((ZWRESUMETHREAD)(oldZwResumeThread))(ThreadHandle, SuspendCount);
+	
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		
+		#ifdef DEBUG
+		DbgPrint("call ZwResumeThread\n");
+		#endif
+		
+		__try 
+		{
+			if(ExGetPreviousMode() != KernelMode)
+				ProbeForRead(SuspendCount, sizeof(ULONG), 1);
+			kSuspendCount = *SuspendCount;
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ss,ThreadHandle->ERROR,SuspendCount->ERROR",exceptionCode)))
+				sendLogs(currentProcessId, L"ZwResumeThread", parameter);
+			else
+				sendLogs(currentProcessId, L"ZwResumeThread", L"0,-1,ss,ThreadHandle->ERROR,SuspendCount->ERROR");
+			ExFreePool(parameter);
+			return statusCall;
+		}
+		
+		if(NT_SUCCESS(statusCall))
+		{
+			log_lvl = LOG_SUCCESS;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ss,ThreadHandle->0x%08x,SuspendCount->%d", ThreadHandle, kSuspendCount)))
+				log_lvl = LOG_PARAM;
+		}
+		else
+		{
+			log_lvl = LOG_ERROR;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,ss,ThreadHandle->0x%08x,SuspendCount->%d", statusCall, ThreadHandle, kSuspendCount)))
+				log_lvl = LOG_PARAM;
+		}
+		
+		switch(log_lvl)
+		{
+			case LOG_PARAM:
+				sendLogs(currentProcessId, L"ZwResumeThread", parameter);
+			break;
+				
+			case LOG_SUCCESS:
+				sendLogs(currentProcessId, L"ZwResumeThread", L"0,-1,ss,ThreadHandle->ERROR,SuspendCount->ERROR");
+			break;
+				
+			default:
+				sendLogs(currentProcessId, L"ZwResumeThread", L"1,0,ss,ThreadHandle->ERROR,SuspendCount->ERROR");
+			break;
+		}
+		if(parameter)
+				ExFreePool(parameter);
+	}
+	return statusCall;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
 //  	Logs delay execution.
 //  Parameters :
 //  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtDelayExecution.html
@@ -2355,6 +2506,8 @@ NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval)
 	}
 	return ((ZWDELAYEXECUTION)(oldZwDelayExecution))(Alertable, DelayInterval);
 }
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  Description :
@@ -2524,7 +2677,7 @@ NTSTATUS newZwQueryAttributesFile(POBJECT_ATTRIBUTES ObjectAttributes, PFILE_BAS
 				return -1; // INVALID_FILE_ATTRIBUTES
 			}	
 			if(kObjectName.Buffer)
-				ExFreePool(parameter);
+				ExFreePool(kObjectName.Buffer);
 		}
 		if(parameter)
 			ExFreePool(parameter);

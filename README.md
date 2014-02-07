@@ -23,6 +23,8 @@ v0.3 changes :
 + fix hook ZwDelayExecution => log the call before executing it
 + Signatures :]
 + some anti VM (virtualbox) detection features (based on pafish PoC)
++ ZwReadVirtualMemory hook
++ ZwResumeThread hook
 
 v0.2 changes :
 + ZwDeviceIoControlFile hook
