@@ -15,8 +15,8 @@
 
 from lib.cuckoo.common.abstracts import Signature
 
-class Ruskill(Signature):
-    name = "bot_russkill"
+class ZeusMutex(Signature):
+    name = "zeus_mutex"
     description = "Creates zeus/ramnit-like mutex"
     severity = 3
     alert = True
@@ -24,4 +24,4 @@ class Ruskill(Signature):
     authors = ["0x00"]
 
     def run(self):
-        return self.check_mutex(pattern="CTF\..*")
+        return self.check_mutex(pattern="CTF\..*", regex=True)
