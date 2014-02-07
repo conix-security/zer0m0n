@@ -15,12 +15,12 @@
 
 from lib.cuckoo.common.abstracts import Signature
 
-class ZeusMutex(Signature):
-    name = "zeus_mutex"
-    description = "Creates zeus/ramnit-like mutex"
-    severity = 3
+class CtfMutex(Signature):
+    name = "ctf_mutex"
+    description = "Creates MS CTF mutex (as seen in zeus/ramnit samples)"
+    severity = 2
     alert = True
-    categories = ["bot", "banker"]
+    categories = ["banker"]
     authors = ["0x00"]
 
     def run(self):
