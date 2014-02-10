@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Claudio "nex" Guarnieri (@botherder)
+# Copyright (C) 2012 JoseMi "h0rm1" Holguin (@j0sm1)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,12 +15,12 @@
 
 from lib.cuckoo.common.abstracts import Signature
 
-class NetworkBIND(Signature):
-    name = "network_bind"
-    description = "Starts servers listening"
+class MultipleDelays(Signature):
+    name = "multiple_delays"
+    description = "Multiple delays (> 300s)"
     severity = 2
-    categories = ["bind"]
-    authors = ["nex","0x00"]
+    categories = ["evasion"]
+    authors = ["0x00"]
     minimum = "1.0"
     evented = True
 
@@ -30,17 +30,10 @@ class NetworkBIND(Signature):
 
     def on_call(self, call, process):
         if process is not self.lastprocess:
+            self.totaldelay = 0
             self.lastprocess = process
-            self.seq = 0
-            self.handle = 0
 
-        if call["api"] == "bind":
-            return True
-        if call["api"] == "ZwCreateFile" and self.seq == 0:
-            if self.get_argument(call, "FileName") == "\\Device\\Afd\\Endpoint":
-                self.seq = 1
-                self.handle = self.get_argument(call, "FileHandle")
-        if call["api"] == "ZwDeviceIoControlFile" and self.seq == 1:
-            if self.get_argument(call, "FileHandle") == self.handle:
-                if self.get_argument(call, "IoControlCode") == "0x0001200C" : # AFD_WAIT_FOR_LISTEN (AFD_BIND not relevant)
-                    return True
+        if call["api"] == "ZwDelayExecution":
+            self.totaldelay = self.totaldelay + int(self.get_argument(call, "DelayInterval"))
+            if self.totaldelay > 300000 :
+                return True

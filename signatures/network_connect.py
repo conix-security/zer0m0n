@@ -15,17 +15,18 @@
 
 from lib.cuckoo.common.abstracts import Signature
 
-class NetworkBIND(Signature):
-    name = "network_bind"
-    description = "Starts servers listening"
-    severity = 2
-    categories = ["bind"]
-    authors = ["nex","0x00"]
+class NetworkCONNECT(Signature):
+    name = "network_connect"
+    description = "Connect to a remote server (winsock)"
+    severity = 1
+    categories = ["network"]
+    authors = ["0x00"]
     minimum = "1.0"
     evented = True
 
     def __init__(self, *args, **kwargs):
         Signature.__init__(self, *args, **kwargs)
+        self.binds = []
         self.lastprocess = None
 
     def on_call(self, call, process):
@@ -34,7 +35,7 @@ class NetworkBIND(Signature):
             self.seq = 0
             self.handle = 0
 
-        if call["api"] == "bind":
+        if call["api"] == "connect":
             return True
         if call["api"] == "ZwCreateFile" and self.seq == 0:
             if self.get_argument(call, "FileName") == "\\Device\\Afd\\Endpoint":
@@ -42,5 +43,5 @@ class NetworkBIND(Signature):
                 self.handle = self.get_argument(call, "FileHandle")
         if call["api"] == "ZwDeviceIoControlFile" and self.seq == 1:
             if self.get_argument(call, "FileHandle") == self.handle:
-                if self.get_argument(call, "IoControlCode") == "0x0001200C" : # AFD_WAIT_FOR_LISTEN (AFD_BIND not relevant)
+                if self.get_argument(call, "IoControlCode") == "0x00012007" :
                     return True

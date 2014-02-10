@@ -35,7 +35,6 @@ class InjectionCRT(Signature):
             self.lastprocess = process
             self.ksequence = 0
             self.kPID = 0
-            self.klastprocess = process
 
         if call["api"] == "ZwOpenProcess" and self.ksequence == 0:
             if self.get_argument(call, "PID") != process["process_id"]:
