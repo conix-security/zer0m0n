@@ -15,10 +15,10 @@
 
 from lib.cuckoo.common.abstracts import Signature
 
-class WriteMemory(Signature):
-    name = "write_memory"
-    description = "Write remote process memory"
-    severity = 1
+class DebugProcess(Signature):
+    name = "debug_process"
+    description = "Debug process (can be used to inject code)"
+    severity = 2
     categories = ["injection"]
     authors = ["0x00"]
     minimum = "1.0"
@@ -26,22 +26,7 @@ class WriteMemory(Signature):
 
     def __init__(self, *args, **kwargs):
         Signature.__init__(self, *args, **kwargs)
-        self.lastprocess = None
 
     def on_call(self, call, process):
-        if process is not self.lastprocess:
-            self.sequence = 0
-            self.process_handle = 0
-            self.lastprocess = process
-
-        if call["api"] == "ZwWriteVirtualMemory":
-            if self.get_argument(call, "PID") != process["process_id"]:
-               return True
-        
-        if call["api"]  == "OpenProcess" and self.sequence == 0:
-            if self.get_argument(call, "ProcessId") != process["process_id"]:
-                self.sequence = 1
-                self.process_handle = call["return"]
-        elif (call["api"] == "NtWriteVirtualMemory" or call["api"] == "WriteProcessMemory") and self.sequence == 1:
-            if self.get_argument(call, "ProcessHandle") == self.process_handle:
-                return True
+        if call["api"] == "ZwDebugActiveProcess":
+            return True
