@@ -37,7 +37,7 @@
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Installs SSDT hooks.
+//		Uninstalls SSDT hooks (XP version)
 //	Parameters :
 //		None
 //	Return value :
@@ -46,7 +46,6 @@
 //		Unset WP bit from CR0 register to be able to modify SSDT entries, restores the original values,
 //		and sets WP bit again.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 VOID unhook_ssdt_entries()
 {
 	disable_cr0();
@@ -134,7 +133,103 @@ VOID unhook_ssdt_entries()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Installs SSDT hooks.
+//		Uninstalls SSDT hooks (Win7 version)
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//	Process :
+//		Unset WP bit from CR0 register to be able to modify SSDT entries, restores the original values,
+//		and sets WP bit again.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+VOID unhook_ssdt_entries7()
+{
+	disable_cr0();
+
+	if(oldZwCreateThread != NULL)
+		(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_WIN7_INDEX) = oldZwCreateThread;
+	
+	if(oldZwMapViewOfSection != NULL)
+		(ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_WIN7_INDEX) = oldZwMapViewOfSection;
+	
+	if(oldZwSetContextThread != NULL)
+		(ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_WIN7_INDEX) = oldZwSetContextThread;
+	
+	if(oldZwQueueApcThread != NULL)
+		(ZWQUEUEAPCTHREAD)SYSTEMSERVICE(QUEUEAPCTHREAD_WIN7_INDEX) = oldZwQueueApcThread;
+	
+	if(oldZwSystemDebugControl != NULL)
+		(ZWSYSTEMDEBUGCONTROL)SYSTEMSERVICE(SYSTEMDEBUGCONTROL_WIN7_INDEX) = oldZwSystemDebugControl;
+	
+	if(oldZwCreateProcess != NULL)
+		(ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_WIN7_INDEX) = oldZwCreateProcess;
+	
+	if(oldZwCreateProcessEx != NULL)
+		(ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_WIN7_INDEX) = oldZwCreateProcessEx;
+	
+	if(oldZwWriteVirtualMemory != NULL)
+		(ZWWRITEVIRTUALMEMORY)SYSTEMSERVICE(WRITEVIRTUALMEMORY_WIN7_INDEX) = oldZwWriteVirtualMemory;
+	
+	if(oldZwDebugActiveProcess != NULL)
+		(ZWDEBUGACTIVEPROCESS)SYSTEMSERVICE(DEBUGACTIVEPROCESS_WIN7_INDEX) = oldZwDebugActiveProcess;
+	
+	if(oldZwOpenProcess != NULL)
+		(ZWOPENPROCESS)SYSTEMSERVICE(OPENPROCESS_WIN7_INDEX) = oldZwOpenProcess;
+	
+	if(oldZwOpenThread != NULL)
+		(ZWOPENTHREAD)SYSTEMSERVICE(OPENTHREAD_WIN7_INDEX) = oldZwOpenThread;
+	
+	if(oldZwQuerySystemInformation != NULL)
+		(ZWQUERYSYSTEMINFORMATION)SYSTEMSERVICE(QUERYSYSTEMINFORMATION_WIN7_INDEX) = oldZwQuerySystemInformation;
+	
+	if(oldZwCreateFile != NULL)
+		(ZWCREATEFILE)SYSTEMSERVICE(CREATEFILE_WIN7_INDEX) = oldZwCreateFile;
+	
+	if(oldZwReadFile != NULL)
+		(ZWREADFILE)SYSTEMSERVICE(READFILE_WIN7_INDEX) = oldZwReadFile;
+	
+	if(oldZwWriteFile != NULL)
+		(ZWWRITEFILE)SYSTEMSERVICE(WRITEFILE_WIN7_INDEX) = oldZwWriteFile;
+	
+	if(oldZwDeleteFile != NULL)
+		(ZWDELETEFILE)SYSTEMSERVICE(DELETEFILE_WIN7_INDEX) = oldZwDeleteFile;
+	
+	if(oldZwSetInformationFile != NULL)
+		(ZWSETINFORMATIONFILE)SYSTEMSERVICE(SETINFORMATIONFILE_WIN7_INDEX) = oldZwSetInformationFile;
+	
+	if(oldZwQueryInformationFile != NULL)
+		(ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_WIN7_INDEX) = oldZwQueryInformationFile;
+	
+	if(oldZwCreateMutant != NULL)
+		(ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_WIN7_INDEX) = oldZwCreateMutant;
+		
+	if(oldZwDeviceIoControlFile != NULL)
+		(ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_WIN7_INDEX) = oldZwDeviceIoControlFile;
+		
+	if(oldZwTerminateProcess != NULL)
+		(ZWTERMINATEPROCESS)SYSTEMSERVICE(TERMINATEPROCESS_WIN7_INDEX) = oldZwTerminateProcess;
+		
+	if(oldZwDelayExecution != NULL)
+		(ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_WIN7_INDEX) = oldZwDelayExecution;
+		
+	if(oldZwQueryValueKey != NULL)
+		(ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_WIN7_INDEX) = oldZwQueryValueKey;
+		
+	if(oldZwQueryAttributesFile != NULL)
+		(ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_WIN7_INDEX) = oldZwQueryAttributesFile;
+		
+	if(oldZwReadVirtualMemory != NULL)
+		(ZWREADVIRTUALMEMORY)SYSTEMSERVICE(QUERYATTRIBUTESFILE_WIN7_INDEX) = oldZwReadVirtualMemory;
+		
+	if(oldZwResumeThread != NULL)
+		(ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_WIN7_INDEX) = oldZwResumeThread;
+		
+	enable_cr0();
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Installs SSDT hooks (XP version)
 //	Parameters :
 //		None
 //	Return value :
@@ -145,6 +240,8 @@ VOID unhook_ssdt_entries()
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID hook_ssdt_entries()
 {
+	DbgPrint("hook entries XP\n");
+	
 	disable_cr0();
 	
 	oldZwCreateThread = (ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX);
@@ -224,10 +321,107 @@ VOID hook_ssdt_entries()
 	
 	oldZwResumeThread = (ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_INDEX);
 	(ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_INDEX) = newZwResumeThread;
-	
+
 	enable_cr0();
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Installs SSDT hooks (Win7 version)
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//	Process :
+//		Unset WP bit from CR0 register to be able to modify SSDT entries, patch with our values after,
+//		saving the original ones, and set the WP bit again.
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+VOID hook_ssdt_entries7()
+{
+	DbgPrint("hook entries windows 7\n");
+	
+	disable_cr0();
+	
+	oldZwCreateThread = (ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_WIN7_INDEX);
+	(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_WIN7_INDEX) = newZwCreateThread;
+	
+	oldZwSetContextThread = (ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_WIN7_INDEX);
+	(ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_WIN7_INDEX) = newZwSetContextThread;
+	
+	oldZwQueueApcThread = (ZWQUEUEAPCTHREAD)SYSTEMSERVICE(QUEUEAPCTHREAD_WIN7_INDEX);
+	(ZWQUEUEAPCTHREAD)SYSTEMSERVICE(QUEUEAPCTHREAD_WIN7_INDEX) = newZwQueueApcThread;
+	
+	oldZwWriteVirtualMemory = (ZWWRITEVIRTUALMEMORY)SYSTEMSERVICE(WRITEVIRTUALMEMORY_WIN7_INDEX);
+	(ZWWRITEVIRTUALMEMORY)SYSTEMSERVICE(WRITEVIRTUALMEMORY_WIN7_INDEX) = newZwWriteVirtualMemory;
+	
+	oldZwSystemDebugControl = (ZWSYSTEMDEBUGCONTROL)SYSTEMSERVICE(SYSTEMDEBUGCONTROL_WIN7_INDEX);
+	(ZWSYSTEMDEBUGCONTROL)SYSTEMSERVICE(SYSTEMDEBUGCONTROL_WIN7_INDEX) = newZwSystemDebugControl;
+	
+	oldZwCreateProcess = (ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_WIN7_INDEX);
+	(ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_WIN7_INDEX) = newZwCreateProcess;
+	
+	oldZwCreateProcessEx = (ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_WIN7_INDEX);
+	(ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_WIN7_INDEX) = newZwCreateProcessEx;
+	
+	oldZwMapViewOfSection = (ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_WIN7_INDEX);
+	(ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_WIN7_INDEX) = newZwMapViewOfSection;
+	
+	oldZwDebugActiveProcess = (ZWDEBUGACTIVEPROCESS)SYSTEMSERVICE(DEBUGACTIVEPROCESS_WIN7_INDEX);
+	(ZWDEBUGACTIVEPROCESS)SYSTEMSERVICE(DEBUGACTIVEPROCESS_WIN7_INDEX) = newZwDebugActiveProcess;
+	
+	oldZwOpenProcess = (ZWOPENPROCESS)SYSTEMSERVICE(OPENPROCESS_WIN7_INDEX);
+	(ZWOPENPROCESS)SYSTEMSERVICE(OPENPROCESS_WIN7_INDEX) = newZwOpenProcess;
+	
+	oldZwOpenThread = (ZWOPENTHREAD)SYSTEMSERVICE(OPENTHREAD_WIN7_INDEX);
+	(ZWOPENTHREAD)SYSTEMSERVICE(OPENTHREAD_WIN7_INDEX) = newZwOpenThread;
+	
+	oldZwQuerySystemInformation = (ZWQUERYSYSTEMINFORMATION)SYSTEMSERVICE(QUERYSYSTEMINFORMATION_WIN7_INDEX);
+	(ZWQUERYSYSTEMINFORMATION)SYSTEMSERVICE(QUERYSYSTEMINFORMATION_WIN7_INDEX) = newZwQuerySystemInformation;
+	
+	oldZwCreateFile = (ZWCREATEFILE)SYSTEMSERVICE(CREATEFILE_WIN7_INDEX);
+	(ZWCREATEFILE)SYSTEMSERVICE(CREATEFILE_WIN7_INDEX) = newZwCreateFile;
+	
+	oldZwReadFile = (ZWREADFILE)SYSTEMSERVICE(READFILE_WIN7_INDEX);
+	(ZWREADFILE)SYSTEMSERVICE(READFILE_WIN7_INDEX) = newZwReadFile;
+	
+	oldZwWriteFile = (ZWWRITEFILE)SYSTEMSERVICE(WRITEFILE_WIN7_INDEX);
+	(ZWWRITEFILE)SYSTEMSERVICE(WRITEFILE_WIN7_INDEX) = newZwWriteFile;
+	
+	oldZwDeleteFile = (ZWDELETEFILE)SYSTEMSERVICE(DELETEFILE_WIN7_INDEX);
+	(ZWDELETEFILE)SYSTEMSERVICE(DELETEFILE_WIN7_INDEX) = newZwDeleteFile;
+	
+	oldZwSetInformationFile = (ZWSETINFORMATIONFILE)SYSTEMSERVICE(SETINFORMATIONFILE_WIN7_INDEX);
+	(ZWSETINFORMATIONFILE)SYSTEMSERVICE(SETINFORMATIONFILE_WIN7_INDEX) = newZwSetInformationFile;
+	
+	oldZwQueryInformationFile = (ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_WIN7_INDEX);
+	(ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_WIN7_INDEX) = newZwQueryInformationFile;
+
+	oldZwCreateMutant = (ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_WIN7_INDEX);
+	(ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_WIN7_INDEX) = newZwCreateMutant;
+	
+	oldZwDeviceIoControlFile = (ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_WIN7_INDEX);
+	(ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_WIN7_INDEX) = newZwDeviceIoControlFile;
+	
+	oldZwTerminateProcess = (ZWTERMINATEPROCESS)SYSTEMSERVICE(TERMINATEPROCESS_WIN7_INDEX);
+	(ZWTERMINATEPROCESS)SYSTEMSERVICE(TERMINATEPROCESS_WIN7_INDEX) = newZwTerminateProcess;
+	
+	oldZwDelayExecution = (ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_WIN7_INDEX);
+	(ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_WIN7_INDEX) = newZwDelayExecution;
+	
+	oldZwQueryValueKey = (ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_WIN7_INDEX);
+	(ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_WIN7_INDEX) = newZwQueryValueKey;
+	
+	oldZwQueryAttributesFile = (ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_WIN7_INDEX);
+	(ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_WIN7_INDEX) = newZwQueryAttributesFile;
+	
+	oldZwReadVirtualMemory = (ZWREADVIRTUALMEMORY)SYSTEMSERVICE(READVIRTUALMEMORY_WIN7_INDEX);
+	(ZWREADVIRTUALMEMORY)SYSTEMSERVICE(READVIRTUALMEMORY_WIN7_INDEX) = newZwReadVirtualMemory;
+	
+	oldZwResumeThread = (ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_WIN7_INDEX);
+	(ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_WIN7_INDEX) = newZwResumeThread;
+
+	enable_cr0();
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -677,7 +871,7 @@ NTSTATUS newZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationC
 //	Return value :
 //		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
 //	Process :
-//		logs the BaseAddress, ProcessHandle, NumberOfBytesToRead and NumberOfBytesReaded parameters.
+//		logs the ProcessHandle, BaseAddress and NumberOfBytesToRead parameters.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded)
 {
@@ -692,7 +886,7 @@ NTSTATUS newZwReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID B
 	if(isProcessMonitoredByPid(currentProcessId))
 	{
 		#ifdef DEBUG
-		DbgPrint("call ZwWriteVirtualMemory\n");
+		DbgPrint("call ZwReadVirtualMemory\n");
 		#endif
 		
 		targetProcessId = getPIDByHandle(ProcessHandle);
@@ -728,6 +922,7 @@ NTSTATUS newZwReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID B
 	}
 	return statusCall;
 }
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -792,6 +987,7 @@ NTSTATUS newZwWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID 
 	}
 	return statusCall;
 }
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -1841,7 +2037,6 @@ NTSTATUS newZwDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes)
 		if(parameter)
 			ExFreePool(parameter);
 	}
-	
 	return statusCall;
 }
 

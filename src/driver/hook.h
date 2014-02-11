@@ -45,7 +45,7 @@
 // SSDT entry access macro
 #define SYSTEMSERVICE(_syscall) KeServiceDescriptorTable.ServiceTableBase[_syscall]
 
-// Syscalls numbers (XP SP3)
+// Syscalls numbers (XP)
 #define CREATETHREAD_INDEX 0x35
 #define SETCONTEXTTHREAD_INDEX 0xD5
 #define QUEUEAPCTHREAD_INDEX 0xB4
@@ -72,6 +72,35 @@
 #define QUERYATTRIBUTESFILE_INDEX 0x8B
 #define READVIRTUALMEMORY_INDEX 0xBA
 #define RESUMETHREAD_INDEX 0xC
+
+// Syscalls numbers (Seven)
+#define CREATETHREAD_WIN7_INDEX 0x57
+#define SETCONTEXTTHREAD_WIN7_INDEX 0x13C
+#define QUEUEAPCTHREAD_WIN7_INDEX 0x10D
+#define SYSTEMDEBUGCONTROL_WIN7_INDEX 0x170
+#define CREATEPROCESS_WIN7_INDEX 0x4F
+#define CREATEPROCESSEX_WIN7_INDEX 0x50
+#define MAPVIEWOFSECTION_WIN7_INDEX 0xA8
+#define WRITEVIRTUALMEMORY_WIN7_INDEX 0x18F
+#define DEBUGACTIVEPROCESS_WIN7_INDEX 0x60
+#define OPENPROCESS_WIN7_INDEX 0xBE
+#define OPENTHREAD_WIN7_INDEX 0xC6
+#define QUERYSYSTEMINFORMATION_WIN7_INDEX 0x105
+#define CREATEFILE_WIN7_INDEX 0x42
+#define READFILE_WIN7_INDEX 0x111
+#define WRITEFILE_WIN7_INDEX 0x18C
+#define DELETEFILE_WIN7_INDEX 0x66
+#define SETINFORMATIONFILE_WIN7_INDEX 0x149
+#define QUERYINFORMATIONFILE_WIN7_INDEX 0xE7
+#define CREATEMUTANT_WIN7_INDEX 0x4A
+#define DEVICEIOCONTROLFILE_WIN7_INDEX 0x6B
+#define TERMINATEPROCESS_WIN7_INDEX 0x172
+#define DELAYEXECUTION_WIN7_INDEX 0x62
+#define QUERYVALUEKEY_WIN7_INDEX 0x10A
+#define QUERYATTRIBUTESFILE_WIN7_INDEX 0xD9
+#define READVIRTUALMEMORY_WIN7_INDEX 0x115
+#define RESUMETHREAD_WIN7_INDEX 0x130
+
 
 typedef struct _ServiceDescriptorEntry {
      unsigned int *ServiceTableBase;
@@ -179,6 +208,7 @@ typedef struct _THREAD_BASIC_INFORMATION {
     ULONG	BasePriority;
 } THREAD_BASIC_INFORMATION, *PTHREAD_BASIC_INFORMATION;
 
+
 // Functions schemes definition
 typedef NTSTATUS(*ZWSETCONTEXTTHREAD)(HANDLE, PCONTEXT); 
 typedef NTSTATUS(*ZWMAPVIEWOFSECTION)(HANDLE, HANDLE, PVOID, ULONG_PTR, SIZE_T, PLARGE_INTEGER, PSIZE_T, SECTION_INHERIT, ULONG, ULONG);
@@ -242,14 +272,13 @@ ZWRESUMETHREAD oldZwResumeThread;
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
 
-
 /////////////////////////////////////////////////////////////////////////////		
 // FUNCTIONS
 /////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Installs SSDT hooks.
+//		Installs SSDT hooks (XP version)
 //	Parameters :
 //		None
 //	Return value :
@@ -259,13 +288,33 @@ VOID hook_ssdt_entries();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Removes SSDT hooks.
+//		Installs SSDT hooks (Win7 version)
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+VOID hook_ssdt_entries7();
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Removes SSDT hooks (XP version)
 //	Parameters :
 //		None
 //	Return value :
 //		None
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID unhook_ssdt_entries();
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Removes SSDT hooks. (Win7 version)
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+VOID unhook_ssdt_entries7();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :

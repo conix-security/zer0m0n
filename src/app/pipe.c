@@ -123,7 +123,7 @@ int pipe(const char *fmt, ...)
 
     va_start(args, fmt);
     len = _pipe_sprintf(NULL, fmt, args);
-    if(len > 0) {
+	if(len > 0) {
 		buf = malloc(len+1);
         _pipe_sprintf(buf, fmt, args);
         va_end(args);

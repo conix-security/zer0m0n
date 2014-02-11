@@ -11,7 +11,7 @@
 //  the Free Software Foundation, either version 3 of the License, or
 //  (at your option) any later version.
 //
-//  Zer0m0n is distributed in the hope that it will be useful,
+//  Zer0m0n is distibuted in the hope that it will be useful,
 //  but WITHOUT ANY WARRANTY; without even the implied warranty of
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
@@ -62,18 +62,21 @@ VOID imageCallback(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_INFO 
 			if(!pwBuf)
 			{
 				sendLogs(pid,L"LOAD_DRIVER", L"1,0,s,DriverName->undefined");
+				cleanMonitoredProcessList();
 				return;
 			}
 			
 			status = RtlStringCchPrintfW(pwBuf, MAXSIZE, L"1,%d,s,DriverName->%wZ", status, FullImageName);
-			if(status != STATUS_BUFFER_OVERFLOW || status != STATUS_SUCCESS)
+			if(status != STATUS_BUFFER_OVERFLOW && status != STATUS_SUCCESS)
 			{
 				sendLogs(pid,L"LOAD_DRIVER", L"1,0,s,DriverName->undefined");
 				ExFreePool(pwBuf);
+				cleanMonitoredProcessList();
 				return;
 			}
 			sendLogs(pid,L"LOAD_DRIVER", pwBuf);
 			ExFreePool(pwBuf);
+			cleanMonitoredProcessList();
 		}
 	}
 }
