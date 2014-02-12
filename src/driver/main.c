@@ -85,7 +85,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	PSECURITY_DESCRIPTOR securityDescriptor;
 	NTSTATUS status;
 	ULONG i;
-	 
+	
 	// import some functions we will need
 	RtlInitUnicodeString(&function, L"ZwQueryInformationThread");
 	ZwQueryInformationThread = MmGetSystemRoutineAddress(&function);
@@ -111,6 +111,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	monitored_process_list = NULL;
 	hidden_process_list = NULL;
 	
+	
 	// initialize every function pointers to null
 	oldZwMapViewOfSection = NULL;
 	oldZwSetContextThread = NULL;
@@ -134,6 +135,10 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	oldZwDeviceIoControlFile = NULL;
 	oldZwTerminateProcess = NULL;
 	oldZwDelayExecution = NULL;
+	oldZwQueryValueKey = NULL;
+	oldZwQueryAttributesFile = NULL;
+	oldZwReadVirtualMemory = NULL;
+	oldZwResumeThread = NULL;
 	
    	status = FltRegisterFilter(pDriverObject,&registration,&filter);
 	if(!NT_SUCCESS(status))
@@ -161,10 +166,11 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	status = PsSetLoadImageNotifyRoutine(imageCallback);
 	if(!NT_SUCCESS(status))
 		return status;
-	
-	hook_ssdt_entries();
+
+	hook_ssdt_entries();	
+
 	pDriverObject->DriverUnload = Unload;
-	
+
 	return STATUS_SUCCESS;
 }
  

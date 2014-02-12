@@ -193,7 +193,8 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 				}
 
 				// notifies analyzer.py
-				pipe("KPROCESS:%d", log.pid);
+				if(log.pid != 4)
+					pipe("KPROCESS:%d", log.pid);
 				
 				// create socket / new struct
 				log.g_sock = log_init(g_config.host_ip, g_config.host_port, 0);
@@ -330,6 +331,15 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		{
 			//pipe("FILE_DEL:%s", log.arguments[0].value);
 		}
+
+		// if a driver is loaded, notifies cuckoo to stop the analysis
+		if(!strcmp(log.funcname, "LOAD_DRIVER"))
+			pipe("KSUBVERT");
+
+		// notifies analyzer.py that a process has terminated
+		if(!strcmp(log.funcname, "ZwTerminateProcess") && !log.ret)
+			pipe("KTERMINATE:%d", atoi(log.arguments[1].value));
+
 		if(log.procname)
 		{
 			free(log.procname);

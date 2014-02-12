@@ -37,7 +37,7 @@
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Installs SSDT hooks.
+//		Uninstalls SSDT hooks (XP version)
 //	Parameters :
 //		None
 //	Return value :
@@ -46,7 +46,6 @@
 //		Unset WP bit from CR0 register to be able to modify SSDT entries, restores the original values,
 //		and sets WP bit again.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 VOID unhook_ssdt_entries()
 {
 	disable_cr0();
@@ -117,12 +116,24 @@ VOID unhook_ssdt_entries()
 	if(oldZwDelayExecution != NULL)
 		(ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_INDEX) = oldZwDelayExecution;
 		
+	if(oldZwQueryValueKey != NULL)
+		(ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_INDEX) = oldZwQueryValueKey;
+		
+	if(oldZwQueryAttributesFile != NULL)
+		(ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX) = oldZwQueryAttributesFile;
+		
+	if(oldZwReadVirtualMemory != NULL)
+		(ZWREADVIRTUALMEMORY)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX) = oldZwReadVirtualMemory;
+		
+	if(oldZwResumeThread != NULL)
+		(ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_INDEX) = oldZwResumeThread;
+		
 	enable_cr0();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Installs SSDT hooks.
+//		Installs SSDT hooks (XP version)
 //	Parameters :
 //		None
 //	Return value :
@@ -132,7 +143,7 @@ VOID unhook_ssdt_entries()
 //		saving the original ones, and set the WP bit again.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID hook_ssdt_entries()
-{
+{	
 	disable_cr0();
 	
 	oldZwCreateThread = (ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX);
@@ -201,6 +212,18 @@ VOID hook_ssdt_entries()
 	oldZwDelayExecution = (ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_INDEX);
 	(ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_INDEX) = newZwDelayExecution;
 	
+	oldZwQueryValueKey = (ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_INDEX);
+	(ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_INDEX) = newZwQueryValueKey;
+	
+	oldZwQueryAttributesFile = (ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX);
+	(ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_INDEX) = newZwQueryAttributesFile;
+	
+	oldZwReadVirtualMemory = (ZWREADVIRTUALMEMORY)SYSTEMSERVICE(READVIRTUALMEMORY_INDEX);
+	(ZWREADVIRTUALMEMORY)SYSTEMSERVICE(READVIRTUALMEMORY_INDEX) = newZwReadVirtualMemory;
+	
+	oldZwResumeThread = (ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_INDEX);
+	(ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_INDEX) = newZwResumeThread;
+
 	enable_cr0();
 }
 
@@ -647,6 +670,67 @@ NTSTATUS newZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationC
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
+//		Logs virtual memory read.
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
+//	Process :
+//		logs the ProcessHandle, BaseAddress and NumberOfBytesToRead parameters.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded)
+{
+	NTSTATUS statusCall;
+	ULONG currentProcessId, targetProcessId;
+	ULONG log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	statusCall = ((ZWREADVIRTUALMEMORY)(oldZwReadVirtualMemory))(ProcessHandle, BaseAddress, Buffer, NumberOfBytesToRead, NumberOfBytesReaded);
+	
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		#ifdef DEBUG
+		DbgPrint("call ZwReadVirtualMemory\n");
+		#endif
+		
+		targetProcessId = getPIDByHandle(ProcessHandle);
+		
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		if(NT_SUCCESS(statusCall))
+		{
+			log_lvl = LOG_SUCCESS;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,NumberOfBytesToRead->%d", ProcessHandle, targetProcessId, BaseAddress, NumberOfBytesToRead)))
+				log_lvl = LOG_PARAM;
+		}
+		else
+		{
+			log_lvl = LOG_ERROR;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssss,ProcessHandle->0x%08x,PID->%d,BaseAddress->0x%08x,NumberOfBytesToRead->%d", statusCall, ProcessHandle, targetProcessId, BaseAddress, NumberOfBytesToRead)))
+				log_lvl = LOG_PARAM;
+		}
+		
+		switch(log_lvl)
+		{
+			case LOG_PARAM:
+				sendLogs(currentProcessId, L"ZwReadVirtualMemory", parameter);
+			break;
+			case LOG_SUCCESS:
+				sendLogs(currentProcessId, L"ZwReadVirtualMemory", L"0,1,ssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,NumberOfBytesToRead->ERROR");
+			break;
+			default:
+				sendLogs(currentProcessId, L"ZwReadVirtualMemory", L"1,0,ssss,ProcessHandle->ERROR,PID->ERROR,BaseAddress->ERROR,NumberOfBytesToRead->ERROR");
+			break;
+		}
+		if(parameter != NULL)
+			ExFreePool(parameter);
+	}
+	return statusCall;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
 //		Logs virtual memory modification.
 //	Parameters :
 //		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtWriteVirtualMemory.html
@@ -708,6 +792,7 @@ NTSTATUS newZwWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID 
 	}
 	return statusCall;
 }
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -1757,7 +1842,6 @@ NTSTATUS newZwDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes)
 		if(parameter)
 			ExFreePool(parameter);
 	}
-	
 	return statusCall;
 }
 
@@ -2290,6 +2374,85 @@ NTSTATUS newZwTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  Description :
+//  	Logs resume thread
+//  Parameters :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
+//  Return value :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
+//	Process :
+//		logs thread handle and SuspendCount
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwResumeThread(HANDLE ThreadHandle, PULONG SuspendCount)
+{
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, kSuspendCount;
+	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	
+	statusCall = ((ZWRESUMETHREAD)(oldZwResumeThread))(ThreadHandle, SuspendCount);
+	
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		
+		#ifdef DEBUG
+		DbgPrint("call ZwResumeThread\n");
+		#endif
+		
+		__try 
+		{
+			if(ExGetPreviousMode() != KernelMode)
+				ProbeForRead(SuspendCount, sizeof(ULONG), 1);
+			kSuspendCount = *SuspendCount;
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ss,ThreadHandle->ERROR,SuspendCount->ERROR",exceptionCode)))
+				sendLogs(currentProcessId, L"ZwResumeThread", parameter);
+			else
+				sendLogs(currentProcessId, L"ZwResumeThread", L"0,-1,ss,ThreadHandle->ERROR,SuspendCount->ERROR");
+			ExFreePool(parameter);
+			return statusCall;
+		}
+		
+		if(NT_SUCCESS(statusCall))
+		{
+			log_lvl = LOG_SUCCESS;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ss,ThreadHandle->0x%08x,SuspendCount->%d", ThreadHandle, kSuspendCount)))
+				log_lvl = LOG_PARAM;
+		}
+		else
+		{
+			log_lvl = LOG_ERROR;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,ss,ThreadHandle->0x%08x,SuspendCount->%d", statusCall, ThreadHandle, kSuspendCount)))
+				log_lvl = LOG_PARAM;
+		}
+		
+		switch(log_lvl)
+		{
+			case LOG_PARAM:
+				sendLogs(currentProcessId, L"ZwResumeThread", parameter);
+			break;
+				
+			case LOG_SUCCESS:
+				sendLogs(currentProcessId, L"ZwResumeThread", L"0,-1,ss,ThreadHandle->ERROR,SuspendCount->ERROR");
+			break;
+				
+			default:
+				sendLogs(currentProcessId, L"ZwResumeThread", L"1,0,ss,ThreadHandle->ERROR,SuspendCount->ERROR");
+			break;
+		}
+		if(parameter)
+				ExFreePool(parameter);
+	}
+	return statusCall;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
 //  	Logs delay execution.
 //  Parameters :
 //  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtDelayExecution.html
@@ -2300,16 +2463,14 @@ NTSTATUS newZwTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval)
 {
-	NTSTATUS statusCall, exceptionCode;
+	NTSTATUS exceptionCode;
 	ULONG currentProcessId;
 	ULONG ms;
-	USHORT log_lvl = LOG_ERROR;
 	PWCHAR parameter = NULL;
 	LARGE_INTEGER kDelayInterval;
 	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
-	statusCall = ((ZWDELAYEXECUTION)(oldZwDelayExecution))(Alertable, DelayInterval);
-	
+
 	if(isProcessMonitoredByPid(currentProcessId))
 	{
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
@@ -2332,40 +2493,195 @@ NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval)
 			else
 				sendLogs(currentProcessId, L"ZwDelayExecution", L"0,-1,s,DelayInterval->ERROR");
 			ExFreePool(parameter);
-			return statusCall;
+			return ((ZWDELAYEXECUTION)(oldZwDelayExecution))(Alertable, DelayInterval);
 		}
 		
 		ms = (ULONG)(-kDelayInterval.QuadPart / 10000);
 		
-		if(NT_SUCCESS(statusCall))
-		{
-			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,s,DelayInterval->%d", ms)))
-				log_lvl = LOG_PARAM;
-		}
-		else
-		{
-			log_lvl = LOG_ERROR;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,DelayInterval->%d", statusCall, ms)))
-				log_lvl = LOG_PARAM;
-		}
-		switch(log_lvl)
-		{
-			case LOG_PARAM:
-				sendLogs(currentProcessId, L"ZwDelayExecution", parameter);
-			break;
-				
-			case LOG_SUCCESS:
-				sendLogs(currentProcessId, L"ZwDelayExecution", L"0,-1,s,DelayInterval->ERROR");
-			break;
-				
-			default:
-				sendLogs(currentProcessId, L"ZwDelayExecution", L"1,0,s,DelayInterval->ERROR");
-			break;
-		}
+		if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,s,DelayInterval->%d", ms)))
+			sendLogs(currentProcessId, L"ZwDelayExecution", parameter);
+			
 		if(parameter)
 				ExFreePool(parameter);
 	}
+	return ((ZWDELAYEXECUTION)(oldZwDelayExecution))(Alertable, DelayInterval);
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Hide VBOX keys.
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
+//	Process :
+//		if a malware tries to identify VirtualBox by querying the key "Identifier", "SystemBiosVersion" 
+//		or "VideoBiosVersion"
+//		for "HKLM\HARDWARE\\DEVICEMAP\\Scsi\\Scsi Port 0\\Scsi Bus 0\\Target Id 0\\Logical Unit Id 0"
+// 		and "HKLM\\HARDWARE\\Description\\System", we return fake informations
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwQueryValueKey(HANDLE KeyHandle, PUNICODE_STRING ValueName, KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass, PVOID KeyValueInformation, ULONG Length, PULONG ResultLength)
+{
+	NTSTATUS statusCall, status;
+	ULONG currentProcessId, len;
+	ULONG sizeNeeded = 0;
+	PKEY_NAME_INFORMATION nameInfo = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	
+	statusCall = ((ZWQUERYVALUEKEY)(oldZwQueryValueKey))(KeyHandle, ValueName, KeyValueInformationClass, KeyValueInformation, Length, ResultLength);
+		
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		#ifdef DEBUG
+		DbgPrint("call ZwQueryValueKey\n");
+		#endif
+		
+		if(NT_SUCCESS(statusCall))
+		{
+			if(ValueName->Buffer)
+			{			
+				ZwQueryKey(KeyHandle, KeyNameInformation, NULL, 0, &sizeNeeded);
+				nameInfo = ExAllocatePoolWithTag(NonPagedPool, sizeNeeded*sizeof(WCHAR), PROC_POOL_TAG);
+				if(!nameInfo)
+					return statusCall;
+				RtlZeroMemory(nameInfo, sizeNeeded*sizeof(WCHAR));
+				status = ZwQueryKey(KeyHandle, KeyNameInformation, nameInfo, sizeNeeded*sizeof(WCHAR), &len);
+				if(!NT_SUCCESS(status))
+					return statusCall;
+									
+				if(!_wcsicmp(nameInfo->Name, L"\\REGISTRY\\MACHINE\\HARDWARE\\DEVICEMAP\\Scsi\\Scsi Port 0\\Scsi Bus 0\\Target Id 0\\Logical Unit Id 0"))
+				{						   
+					if(!_wcsicmp(ValueName->Buffer, L"Identifier"))
+					{
+						len = wcslen(L"ST38001A");
+						if(KeyValueInformation && RtlStringCchPrintfW(((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Name, len, L"ST38001A"))
+						{
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Type = 1;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->TitleIndex = 0;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->NameLength = len;
+						}
+					}
+				}
+				else if(!_wcsicmp(nameInfo->Name, L"\\REGISTRY\\MACHINE\\HARDWARE\\DESCRIPTION\\System"))
+				{
+					if(!_wcsicmp(ValueName->Buffer, L"SystemBiosVersion"))
+					{
+						len = wcslen(L"DELL   - 15 Phoenix ROM BIOS PLUS Version 1.10 A07");
+						if(KeyValueInformation && RtlStringCchPrintfW(((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Name, len, L"DELL   - 15 Phoenix ROM BIOS PLUS Version 1.10 A07"))
+						{
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Type = 7;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->TitleIndex = 0;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->NameLength = len;
+						}
+					}
+					else if(!_wcsicmp(ValueName->Buffer, L"VideoBiosVersion"))
+					{
+						len = wcslen(L"Hardware Version 1.0");
+						if(KeyValueInformation && RtlStringCchPrintfW(((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Name, len, L"Hardware Version 1.0"))
+						{
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Type = 7;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->TitleIndex = 0;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->NameLength = len;
+						}
+					}
+				}
+				if(nameInfo)
+					ExFreePool(nameInfo);
+			}
+		}
+	}
+	return statusCall;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Hide VBOX files
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
+//	Process :
+//		if a malware tries to identify VirtualBox by trying to get attributes of vbox files, we return
+//		INVALID_FILE_ATTRIBUTES.
+//		we only log when there is an attempt to detect VirtualBox
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwQueryAttributesFile(POBJECT_ATTRIBUTES ObjectAttributes, PFILE_BASIC_INFORMATION FileInformation)
+{
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId;
+	PWCHAR parameter = NULL;
+	UNICODE_STRING kObjectName;
+	
+	kObjectName.Buffer = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	statusCall = ((ZWQUERYATTRIBUTESFILE)(oldZwQueryAttributesFile))(ObjectAttributes, FileInformation);
+
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		
+		#ifdef DEBUG
+		DbgPrint("call ZwQueryAttributesFile\n");
+		#endif
+		
+		if(NT_SUCCESS(statusCall))
+		{
+			__try
+			{
+				if(ExGetPreviousMode() != KernelMode)
+				{
+					ProbeForRead(ObjectAttributes, sizeof(OBJECT_ATTRIBUTES), 1);
+					ProbeForRead(ObjectAttributes->ObjectName, sizeof(UNICODE_STRING), 1);
+					ProbeForRead(ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length, 1);	
+				}
+				kObjectName.Length = ObjectAttributes->ObjectName->Length;
+				kObjectName.MaximumLength = ObjectAttributes->ObjectName->Length;
+				kObjectName.Buffer = ExAllocatePoolWithTag(NonPagedPool, kObjectName.MaximumLength, BUFFER_TAG);
+				if(!kObjectName.Buffer)
+				{
+					if(parameter)
+						ExFreePool(parameter);
+					sendLogs(currentProcessId, L"ZwQueryAttributesFile", L"0,-1,s,FileName->ERROR");
+					return statusCall;
+				}
+				RtlCopyUnicodeString(&kObjectName, ObjectAttributes->ObjectName);
+			}
+			__except (EXCEPTION_EXECUTE_HANDLER)
+			{
+				exceptionCode = GetExceptionCode();
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,FileName->ERROR", exceptionCode)))
+					sendLogs(currentProcessId, L"ZwQueryAttributesFile", parameter);
+				else 
+					sendLogs(currentProcessId, L"ZwQueryAttributesFile", L"0,-1,s,FileName->ERROR");
+				if(parameter)
+					ExFreePool(parameter);
+				if(kObjectName.Buffer)
+					ExFreePool(kObjectName.Buffer);
+				return statusCall;
+			}
+			
+			if(!_wcsicmp(kObjectName.Buffer, L"\\??\\C:\\Windows\\system32\\drivers\\VBoxMouse.sys"))
+			{
+				if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,-1,s,FileName->%ws", kObjectName.Buffer)))
+					sendLogs(currentProcessId, L"ZwQueryAttributesFile", parameter);
+				else 
+					sendLogs(currentProcessId, L"ZwQueryAttributesFile", L"0,-1,s,FileName->ERROR");
+				if(parameter)
+					ExFreePool(parameter);
+				if(kObjectName.Buffer)
+					ExFreePool(kObjectName.Buffer);
+				return -1; // INVALID_FILE_ATTRIBUTES
+			}	
+			if(kObjectName.Buffer)
+				ExFreePool(kObjectName.Buffer);
+		}
+		if(parameter)
+			ExFreePool(parameter);
+	}		
 	return statusCall;
 }
 

@@ -17,26 +17,30 @@ from lib.cuckoo.common.abstracts import Signature
 
 class NetworkBIND(Signature):
     name = "network_bind"
-    description = "Starts servers listening on {0}"
+    description = "Starts servers listening"
     severity = 2
     categories = ["bind"]
-    authors = ["nex"]
+    authors = ["nex","0x00"]
     minimum = "1.0"
     evented = True
 
     def __init__(self, *args, **kwargs):
         Signature.__init__(self, *args, **kwargs)
-        self.binds = []
+        self.lastprocess = None
 
     def on_call(self, call, process):
-        if call["api"] != "bind":
-            return
+        if process is not self.lastprocess:
+            self.lastprocess = process
+            self.seq = 0
+            self.handle = 0
 
-        bind = "{0}:{1}".format(self.get_argument(call, "ip"), self.get_argument(call, "port"))
-        if bind not in self.binds:
-            self.binds.append(bind)
-
-    def on_complete(self):
-        if self.binds:
-            self.description = self.description.format(", ".join(self.binds))
+        if call["api"] == "bind":
             return True
+        if call["api"] == "ZwCreateFile" and self.seq == 0:
+            if self.get_argument(call, "FileName") == "\\Device\\Afd\\Endpoint":
+                self.seq = 1
+                self.handle = self.get_argument(call, "FileHandle")
+        if call["api"] == "ZwDeviceIoControlFile" and self.seq == 1:
+            if self.get_argument(call, "FileHandle") == self.handle:
+                if self.get_argument(call, "IoControlCode") == "0x0001200C" : # AFD_WAIT_FOR_LISTEN (AFD_BIND not relevant)
+                    return True

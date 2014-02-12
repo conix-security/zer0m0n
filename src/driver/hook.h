@@ -45,7 +45,7 @@
 // SSDT entry access macro
 #define SYSTEMSERVICE(_syscall) KeServiceDescriptorTable.ServiceTableBase[_syscall]
 
-// Syscalls numbers (XP SP3)
+// Syscalls numbers (XP)
 #define CREATETHREAD_INDEX 0x35
 #define SETCONTEXTTHREAD_INDEX 0xD5
 #define QUEUEAPCTHREAD_INDEX 0xB4
@@ -68,13 +68,12 @@
 #define DEVICEIOCONTROLFILE_INDEX 0x42
 #define TERMINATEPROCESS_INDEX 0x101
 #define DELAYEXECUTION_INDEX 0x3B
+#define QUERYVALUEKEY_INDEX 0xB1
+#define QUERYATTRIBUTESFILE_INDEX 0x8B
+#define READVIRTUALMEMORY_INDEX 0xBA
+#define RESUMETHREAD_INDEX 0xC
 
-/////////////////////////////////////////////////////////////////////////////		
-// STRUCTS
-/////////////////////////////////////////////////////////////////////////////
 
-// SSDT entry struct
-#pragma pack(1)
 typedef struct _ServiceDescriptorEntry {
      unsigned int *ServiceTableBase;
      unsigned int *ServiceCounterTableBase;
@@ -181,6 +180,7 @@ typedef struct _THREAD_BASIC_INFORMATION {
     ULONG	BasePriority;
 } THREAD_BASIC_INFORMATION, *PTHREAD_BASIC_INFORMATION;
 
+
 // Functions schemes definition
 typedef NTSTATUS(*ZWSETCONTEXTTHREAD)(HANDLE, PCONTEXT); 
 typedef NTSTATUS(*ZWMAPVIEWOFSECTION)(HANDLE, HANDLE, PVOID, ULONG_PTR, SIZE_T, PLARGE_INTEGER, PSIZE_T, SECTION_INHERIT, ULONG, ULONG);
@@ -204,6 +204,10 @@ typedef NTSTATUS(*ZWCREATEMUTANT)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, BOOL
 typedef NTSTATUS(*ZWDEVICEIOCONTROLFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, ULONG, PVOID, ULONG, PVOID, ULONG);
 typedef NTSTATUS(*ZWTERMINATEPROCESS)(HANDLE, NTSTATUS);
 typedef NTSTATUS(*ZWDELAYEXECUTION)(BOOLEAN, PLARGE_INTEGER);
+typedef NTSTATUS(*ZWQUERYVALUEKEY)(HANDLE, PUNICODE_STRING, KEY_VALUE_INFORMATION_CLASS, PVOID, ULONG, PULONG);
+typedef NTSTATUS(*ZWQUERYATTRIBUTESFILE)(POBJECT_ATTRIBUTES, PFILE_BASIC_INFORMATION);
+typedef NTSTATUS(*ZWREADVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
+typedef NTSTATUS(*ZWRESUMETHREAD)(HANDLE, PULONG);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
@@ -232,10 +236,13 @@ ZWCREATEMUTANT oldZwCreateMutant;
 ZWDEVICEIOCONTROLFILE oldZwDeviceIoControlFile;
 ZWTERMINATEPROCESS oldZwTerminateProcess;
 ZWDELAYEXECUTION oldZwDelayExecution;
+ZWQUERYVALUEKEY oldZwQueryValueKey;
+ZWQUERYATTRIBUTESFILE oldZwQueryAttributesFile;
+ZWREADVIRTUALMEMORY oldZwReadVirtualMemory;
+ZWRESUMETHREAD oldZwResumeThread;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
-
 
 /////////////////////////////////////////////////////////////////////////////		
 // FUNCTIONS
@@ -243,7 +250,7 @@ __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Installs SSDT hooks.
+//		Installs SSDT hooks (XP version)
 //	Parameters :
 //		None
 //	Return value :
@@ -253,7 +260,7 @@ VOID hook_ssdt_entries();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Removes SSDT hooks.
+//		Removes SSDT hooks (XP version)
 //	Parameters :
 //		None
 //	Return value :
@@ -501,5 +508,45 @@ NTSTATUS newZwTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus);
 //  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtDelayExecution.html
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Hide VBOX keys.
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwQueryValueKey(HANDLE KeyHandle, PUNICODE_STRING ValueName, KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass, PVOID KeyValueInformation, ULONG Length, PULONG ResultLength);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Hide VBOX files
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwQueryAttributesFile(POBJECT_ATTRIBUTES ObjectAttributes, PFILE_BASIC_INFORMATION FileInformation);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs virtual memory read.
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Logs resume thread
+//  Parameters :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
+//  Return value :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwResumeThread(HANDLE ThreadHandle, PULONG SuspendCount);
 
 #endif

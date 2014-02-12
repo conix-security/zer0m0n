@@ -1,4 +1,4 @@
-zer0m0n v0.2
+zer0m0n v0.3
 ============
 
 zer0m0n is a driver for Cuckoo Sandbox, it will perform kernel analysis during the execution of a malware. There are many ways for a malware author to bypass Cuckoo detection, he can detect the hooks, hardcodes the Nt* functions to avoid the hooks, detect the virtual machine... The goal of this driver is to offer the possibility for the user to choose between the classical userland analysis or a kernel analysis, which will be harder to detect or bypass.
@@ -8,13 +8,21 @@ Actually, it only works for XP 32 bit Windows machines, because of SSDT hooks us
 CHANGELOG
 =========
 
+v0.3
++ fix minor bugs
++ fix ZwTerminateProcess race condition (notify analyzer.py of process termination)
++ fix hook ZwDelayExecution (log the call before executing it)
++ signatures
++ some anti VM (virtualbox) detection features (based on pafish PoC)
++ ZwReadVirtualMemory hook
++ ZwResumeThread hook
++ handle driver execution (abort analysis)
+
+
 v0.2
 + added ZwDeviceIoControlFile, ZwCreateMutant, ZwDelayExecution & ZwTerminateProcess SSDT hooks
 + fixed deadlock bug (inifinte wait on FltSendMessage)
 + fixed performance issues (drop => patched using multithreading in logs_dispatcher)
-
-v0.1
-+ startup version :}
 
 How it works
 ============

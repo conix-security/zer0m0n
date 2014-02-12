@@ -112,7 +112,7 @@ NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
 		KeReleaseMutex(&mutex, FALSE);
 		return STATUS_NO_MEMORY;
 	}
-
+	
 	status = getProcNameByPID(pid, &processName);
 	if(!NT_SUCCESS(status))
 	{

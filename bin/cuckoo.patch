@@ -1,10 +1,33 @@
 diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.py
 --- original/analyzer/windows/analyzer.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/analyzer.py	2014-01-31 21:43:44.775508446 +0100
-@@ -221,6 +221,26 @@ class PipeHandler(Thread):
++++ new/analyzer/windows/analyzer.py	2014-02-11 18:04:50.869030545 +0100
+@@ -64,6 +64,12 @@ def add_pid(pid):
+         log.info("Added new process to list with pid: %s", pid)
+         PROCESS_LIST.append(pid)
+ 
++def remove_pid(pid):
++    """Remove a process to process list."""
++    if type(pid) == long or type(pid) == int or type(pid) == str:
++        log.info("Process with pid %s has terminated", pid)
++        PROCESS_LIST.remove(pid)
++
+ def add_pids(pids):
+     """Add PID."""
+     if type(pids) == list:
+@@ -220,6 +226,40 @@ class PipeHandler(Thread):
+                     response = "\x00"
                  else:
                      response = hookdll_encode(url_dlls)
- 
++            
++            # remove pid from process list because we received a notification
++            # from kernel land
++            elif command.startswith("KTERMINATE:"):
++                data = command[11:]
++                process_id = int(data)
++                if process_id:
++                    if process_id in PROCESS_LIST:
++                        remove_pid(process_id) 
++
 +            # same than below but we don't want to inject any DLLs because
 +            # it's a kernel analysis
 +            elif command.startswith("KPROCESS:"):
@@ -24,13 +47,53 @@ diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.p
 +                                log.info("Announce process name : %s", filename)
 +                PROCESS_LOCK.release()                
 +
-+
++            # if a new driver has been loaded, we stop the analysis
++            elif command == "KSUBVERT":
++                for pid in PROCESS_LIST:
++                    log.info("Process with pid %s has terminated", pid)
++                    PROCESS_LIST.remove(pid)
+ 
              # In case of PID, the client is trying to notify the creation of
              # a new process to be injected and monitored.
-             elif command.startswith("PROCESS:"):
+@@ -612,6 +652,7 @@ class Analyzer:
+             pid_check = False
+ 
+         time_counter = 0
++        kernel_analysis = self.get_options().get("kernel_analysis", None)
+ 
+         while True:
+             time_counter += 1
+@@ -630,17 +671,20 @@ class Analyzer:
+                 # If the process monitor is enabled we start checking whether
+                 # the monitored processes are still alive.
+                 if pid_check:
+-                    for pid in PROCESS_LIST:
+-                        if not Process(pid=pid).is_alive():
+-                            log.info("Process with pid %s has terminated", pid)
+-                            PROCESS_LIST.remove(pid)
++                    if kernel_analysis is False:
++                        for pid in PROCESS_LIST:
++                            if not Process(pid=pid).is_alive():
++                                log.info("Process with pid %s has terminated", pid)
++                                PROCESS_LIST.remove(pid)
+ 
+                     # If none of the monitored processes are still alive, we
+                     # can terminate the analysis.
+                     if len(PROCESS_LIST) == 0:
+-                        log.info("Process list is empty, "
+-                                 "terminating analysis...")
+-                        break
++                       KERNEL32.Sleep(1000)
++                       if len(PROCESS_LIST) == 0:
++                            log.info("Process list is empty, "
++                                     "terminating analysis...")
++                            break
+ 
+                     # Update the list of monitored processes available to the
+                     # analysis package. It could be used for internal
 diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib/api/process.py
 --- original/analyzer/windows/lib/api/process.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/lib/api/process.py	2014-01-31 21:43:44.878841780 +0100
++++ new/analyzer/windows/lib/api/process.py	2014-02-11 18:04:50.872363878 +0100
 @@ -5,6 +5,8 @@
  import os
  import logging
@@ -165,7 +228,7 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
      def wait(self):
 diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/windows/modules/packages/applet.py
 --- original/analyzer/windows/modules/packages/applet.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/applet.py	2014-01-31 21:43:44.852175113 +0100
++++ new/analyzer/windows/modules/packages/applet.py	2014-02-11 18:04:50.872363878 +0100
 @@ -50,6 +50,9 @@ class Applet(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -193,7 +256,7 @@ diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/win
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/windows/modules/packages/bin.py
 --- original/analyzer/windows/modules/packages/bin.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/bin.py	2014-01-31 21:43:44.852175113 +0100
++++ new/analyzer/windows/modules/packages/bin.py	2014-02-11 18:04:50.872363878 +0100
 @@ -11,8 +11,12 @@ class Shellcode(Package):
      def start(self, path):
          p = Process()
@@ -211,7 +274,7 @@ diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/window
          return p.pid
 diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/windows/modules/packages/cpl.py
 --- original/analyzer/windows/modules/packages/cpl.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/cpl.py	2014-01-31 21:43:44.852175113 +0100
++++ new/analyzer/windows/modules/packages/cpl.py	2014-02-11 18:04:50.872363878 +0100
 @@ -26,18 +26,22 @@ class CPL(Package):
  
          dll = self.options.get("dll", None)
@@ -239,7 +302,7 @@ diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/windows/modules/packages/dll.py
 --- original/analyzer/windows/modules/packages/dll.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/dll.py	2014-01-31 21:43:44.852175113 +0100
++++ new/analyzer/windows/modules/packages/dll.py	2014-02-11 18:04:50.872363878 +0100
 @@ -14,6 +14,9 @@ class Dll(Package):
          function = self.options.get("function", "DllMain")
          arguments = self.options.get("arguments", None)
@@ -268,7 +331,7 @@ diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/windows/modules/packages/doc.py
 --- original/analyzer/windows/modules/packages/doc.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/doc.py	2014-01-31 21:43:44.852175113 +0100
++++ new/analyzer/windows/modules/packages/doc.py	2014-02-11 18:04:50.872363878 +0100
 @@ -37,17 +37,22 @@ class DOC(Package):
  
          dll = self.options.get("dll", None)
@@ -296,7 +359,7 @@ diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/windows/modules/packages/exe.py
 --- original/analyzer/windows/modules/packages/exe.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/exe.py	2014-01-31 21:43:44.852175113 +0100
++++ new/analyzer/windows/modules/packages/exe.py	2014-02-11 18:04:50.872363878 +0100
 @@ -13,17 +13,21 @@ class Exe(Package):
          free = self.options.get("free", False)
          args = self.options.get("arguments", None)
@@ -323,7 +386,7 @@ diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/window
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/windows/modules/packages/generic.py
 --- original/analyzer/windows/modules/packages/generic.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/generic.py	2014-01-31 21:43:44.852175113 +0100
++++ new/analyzer/windows/modules/packages/generic.py	2014-02-11 18:04:50.872363878 +0100
 @@ -14,6 +14,9 @@ class Genric(Package):
      def start(self, path):
          free = self.options.get("free", False)
@@ -352,7 +415,7 @@ diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/wi
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windows/modules/packages/html.py
 --- original/analyzer/windows/modules/packages/html.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/html.py	2014-01-31 21:43:44.852175113 +0100
++++ new/analyzer/windows/modules/packages/html.py	2014-02-11 18:04:50.872363878 +0100
 @@ -14,6 +14,9 @@ class HTML(Package):
      def start(self, path):
          free = self.options.get("free", False)
@@ -381,7 +444,7 @@ diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windo
          else:
 diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows/modules/packages/ie.py
 --- original/analyzer/windows/modules/packages/ie.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/ie.py	2014-01-31 21:43:44.855508445 +0100
++++ new/analyzer/windows/modules/packages/ie.py	2014-02-11 18:04:50.872363878 +0100
 @@ -15,6 +15,9 @@ class IE(Package):
      def start(self, url):
          free = self.options.get("free", False)
@@ -410,7 +473,7 @@ diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows
          else:
 diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/windows/modules/packages/jar.py
 --- original/analyzer/windows/modules/packages/jar.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/jar.py	2014-01-31 21:43:44.852175113 +0100
++++ new/analyzer/windows/modules/packages/jar.py	2014-02-11 18:04:50.872363878 +0100
 @@ -33,6 +33,9 @@ class Jar(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -439,7 +502,7 @@ diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/windows/modules/packages/pdf.py
 --- original/analyzer/windows/modules/packages/pdf.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/pdf.py	2014-01-31 21:43:44.855508445 +0100
++++ new/analyzer/windows/modules/packages/pdf.py	2014-02-11 18:04:50.872363878 +0100
 @@ -34,17 +34,21 @@ class PDF(Package):
  
          dll = self.options.get("dll", None)
@@ -466,7 +529,7 @@ diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/windows/modules/packages/vbs.py
 --- original/analyzer/windows/modules/packages/vbs.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/vbs.py	2014-01-31 21:43:44.855508445 +0100
++++ new/analyzer/windows/modules/packages/vbs.py	2014-02-11 18:04:50.872363878 +0100
 @@ -33,17 +33,21 @@ class VBS(Package):
  
          dll = self.options.get("dll", None)
@@ -493,7 +556,7 @@ diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/windows/modules/packages/xls.py
 --- original/analyzer/windows/modules/packages/xls.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/xls.py	2014-01-31 21:43:44.855508445 +0100
++++ new/analyzer/windows/modules/packages/xls.py	2014-02-11 18:04:50.872363878 +0100
 @@ -36,17 +36,21 @@ class XLS(Package):
  
          dll = self.options.get("dll", None)
@@ -520,7 +583,7 @@ diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/windows/modules/packages/zip.py
 --- original/analyzer/windows/modules/packages/zip.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/zip.py	2014-01-31 21:43:44.852175113 +0100
++++ new/analyzer/windows/modules/packages/zip.py	2014-02-11 18:04:50.872363878 +0100
 @@ -43,17 +43,21 @@ class Zip(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -547,14 +610,14 @@ diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/window
          else:
 diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
 --- original/lib/cuckoo/common/logtbl.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/lib/cuckoo/common/logtbl.py	2014-01-31 21:43:45.212175113 +0100
++++ new/lib/cuckoo/common/logtbl.py	2014-02-11 18:04:50.989030551 +0100
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
 +	# Copyright (C) 2010-2013 Cuckoo Sandbox Developers.
  # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
  # See the file 'docs/LICENSE' for copying permission.
  
-@@ -193,4 +193,38 @@ table = [
+@@ -193,4 +193,41 @@ table = [
      ("ZwMapViewOfSection", "process", ("ppPp", "SectionHandle", "ProcessHandle", "BaseAddress", "SectionOffset")),
      ("GetSystemMetrics", "misc", ("l", "SystemMetricIndex")),
      ("GetCursorPos", "misc", ("ll", "x", "y")),
@@ -592,10 +655,13 @@ diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
 +	("ZwDeviceIoControlFile", "system", ("ss", "FileHandle", "IoControlColde")),
 +	("ZwTerminateProcess", "process", ("sss", "ProcessHandle", "PID", "ExitStatus")),
 +	("ZwDelayExecution", "system", ("s", "DelayInterval")),
++	("ZwQueryAttributesFile", "filesystem", ("s", "FileName")),
++	("ZwReadVirtualMemory", "process", ("ssss", "ProcessHandle", "PID", "BaseAddress", "NumberOfBytesToRead")),
++	("ZwResumeThread", "threading", ("ss", "ThreadHandle", "SuspendCount")),
  ]
 diff -rupN original/lib/cuckoo/core/database.py new/lib/cuckoo/core/database.py
 --- original/lib/cuckoo/core/database.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/lib/cuckoo/core/database.py	2014-01-31 21:43:45.192175112 +0100
++++ new/lib/cuckoo/core/database.py	2014-02-11 18:04:50.989030551 +0100
 @@ -271,6 +271,7 @@ class Task(Base):
      target = Column(Text(), nullable=False)
      category = Column(String(255), nullable=False)
@@ -689,7 +755,7 @@ diff -rupN original/lib/cuckoo/core/database.py new/lib/cuckoo/core/database.py
                     task.machine,
 diff -rupN original/modules/processing/behavior.py new/modules/processing/behavior.py
 --- original/modules/processing/behavior.py	2014-01-09 15:47:55.000000000 +0100
-+++ new/modules/processing/behavior.py	2014-01-31 21:43:45.092175113 +0100
++++ new/modules/processing/behavior.py	2014-02-11 18:04:50.975697215 +0100
 @@ -329,6 +329,20 @@ class Summary:
              name = self._check_registry(registry, subkey, handle)
              if name and name not in self.keys:
@@ -713,7 +779,7 @@ diff -rupN original/modules/processing/behavior.py new/modules/processing/behavi
              subkey = ""
 diff -rupN original/web/submission/views.py new/web/submission/views.py
 --- original/web/submission/views.py	2014-01-09 15:47:49.000000000 +0100
-+++ new/web/submission/views.py	2014-01-31 21:43:49.655508451 +0100
++++ new/web/submission/views.py	2014-02-11 18:04:51.085697221 +0100
 @@ -26,6 +26,7 @@ def index(request):
          package = request.POST.get("package", "")
          timeout = force_int(request.POST.get("timeout"))
@@ -752,7 +818,7 @@ diff -rupN original/web/submission/views.py new/web/submission/views.py
                                   custom=custom,
 diff -rupN original/web/templates/submission/index.html new/web/templates/submission/index.html
 --- original/web/templates/submission/index.html	2014-01-09 15:47:49.000000000 +0100
-+++ new/web/templates/submission/index.html	2014-01-31 21:43:48.692175118 +0100
++++ new/web/templates/submission/index.html	2014-02-11 18:04:51.059030553 +0100
 @@ -101,6 +101,15 @@ $(document).ready( function() {
                                  <label for="form_options">Options</label>
                                  <input type="text" class="form-control" id="form_options" name="options" />

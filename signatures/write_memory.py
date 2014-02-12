@@ -15,10 +15,10 @@
 
 from lib.cuckoo.common.abstracts import Signature
 
-class InjectionCRT(Signature):
+class WriteMemory(Signature):
     name = "write_memory"
     description = "Write remote process memory"
-    severity = 2
+    severity = 1
     categories = ["injection"]
     authors = ["0x00"]
     minimum = "1.0"

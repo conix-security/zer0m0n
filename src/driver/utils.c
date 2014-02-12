@@ -100,6 +100,13 @@ NTSTATUS getProcNameByPID(ULONG pid, PUNICODE_STRING procName)
 	if(pid == 0 || procName == NULL)
 		return STATUS_INVALID_PARAMETER;
 
+	if(pid == 4)
+	{
+		RtlInitUnicodeString(&func, L"System");
+		RtlCopyUnicodeString(procName, &func);
+		return STATUS_SUCCESS;
+	}
+	
 	status = PsLookupProcessByProcessId((HANDLE)pid, &eProcess);
 	if(!NT_SUCCESS(status))
 		return status;
