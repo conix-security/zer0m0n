@@ -55,7 +55,7 @@ INSTALL/USE
 
 To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo and prepare the host.
 
- 1- First patch cuckoo using the .patch file, in order to support the driver. If you're updating from a previously patched version, just unzip the cuckoo_files.zip file and merge folders :].
+ 1- First patch cuckoo using the .patch file, in order to support the driver.
 
     - copy "cuckoo.patch" to your cuckoo root directory
   
@@ -72,6 +72,8 @@ To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo 
  5- Snapshot the VM
 
 While submitting a new analysis, choose "kernelland" option on the Web interface, or use the option "kernel_analysis=yes" on commandline.
+
+Updating zer0m0n: edit then use the /bin/update_cuckoo.sh to update your cuckoo+zer0m0n installation :]
 
 SIGNATURES
 ==========
