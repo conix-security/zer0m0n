@@ -72,7 +72,7 @@
 #define QUERYATTRIBUTESFILE_INDEX 0x8B
 #define READVIRTUALMEMORY_INDEX 0xBA
 #define RESUMETHREAD_INDEX 0xC
-
+#define CREATESECTION_INDEX 0x32
 
 typedef struct _ServiceDescriptorEntry {
      unsigned int *ServiceTableBase;
@@ -208,6 +208,7 @@ typedef NTSTATUS(*ZWQUERYVALUEKEY)(HANDLE, PUNICODE_STRING, KEY_VALUE_INFORMATIO
 typedef NTSTATUS(*ZWQUERYATTRIBUTESFILE)(POBJECT_ATTRIBUTES, PFILE_BASIC_INFORMATION);
 typedef NTSTATUS(*ZWREADVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
 typedef NTSTATUS(*ZWRESUMETHREAD)(HANDLE, PULONG);
+typedef NTSTATUS(*ZWCREATESECTION)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PLARGE_INTEGER, ULONG, ULONG, HANDLE);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
@@ -240,6 +241,7 @@ ZWQUERYVALUEKEY oldZwQueryValueKey;
 ZWQUERYATTRIBUTESFILE oldZwQueryAttributesFile;
 ZWREADVIRTUALMEMORY oldZwReadVirtualMemory;
 ZWRESUMETHREAD oldZwResumeThread;
+ZWCREATESECTION oldZwCreateSection;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
@@ -548,5 +550,16 @@ NTSTATUS newZwReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID B
 //  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwResumeThread(HANDLE ThreadHandle, PULONG SuspendCount);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process name creation.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566428%28v=vs.85%29.aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566428%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwCreateSection(PHANDLE SectionHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PLARGE_INTEGER MaximumSize, ULONG SectionPageProtection, ULONG AllocationAttributes, HANDLE FileHandle);
+
 
 #endif

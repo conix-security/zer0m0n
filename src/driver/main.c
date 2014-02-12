@@ -139,6 +139,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	oldZwQueryAttributesFile = NULL;
 	oldZwReadVirtualMemory = NULL;
 	oldZwResumeThread = NULL;
+	oldZwCreateSection = NULL;
 	
    	status = FltRegisterFilter(pDriverObject,&registration,&filter);
 	if(!NT_SUCCESS(status))
