@@ -55,7 +55,7 @@ INSTALL/USE
 
 To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo and prepare the host.
 
- 1- First patch cuckoo using the .patch file, in order to support the driver.
+ 1- First patch cuckoo using the .patch file, in order to support the driver. If you're updating from a previously patched version, just unzip the cuckoo_files.zip file and merge folders :].
 
     - copy "cuckoo.patch" to your cuckoo root directory
   
