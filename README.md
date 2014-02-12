@@ -9,7 +9,6 @@ To-do :
 + Add anti-detection features (cuckoo/VM files/process/reg/connections)
 + Hide thread listing
 + Handle machine poweroff
-+ Handle driver execution (abort analysis)
 + Add monitored functions/events
 + Handle file deletion
 + Log registry callbacks return values
@@ -19,12 +18,14 @@ To-do :
 + etc.
 
 v0.3 changes :
++ fix minor bugs
 + fix ZwTerminateProcess race condition (notify analyzer.py of process termination)
 + fix hook ZwDelayExecution => log the call before executing it
 + Signatures :]
 + some anti VM (virtualbox) detection features (based on pafish PoC)
 + ZwReadVirtualMemory hook
 + ZwResumeThread hook
++ handle driver execution (abort analysis)
 
 v0.2 changes :
 + ZwDeviceIoControlFile hook
