@@ -16,6 +16,10 @@ To-do :
 + fix random socket desynch
 + etc.
 
+v0.4 changes :
++ more anti VM detection features
++ log process creation name through ZwCreateSection hook 
+
 v0.3 changes :
 + fix minor bugs
 + fix ZwTerminateProcess race condition (notify analyzer.py of process termination)
