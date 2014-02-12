@@ -1,4 +1,4 @@
-zer0m0n v0.3 (DEVELOPMENT BRANCH)
+zer0m0n v0.4 (DEVELOPMENT BRANCH)
 =================================
 
 To-do :
@@ -7,14 +7,13 @@ To-do :
 + Get ZwCreateProcess* filename parameter
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
 + Add anti-detection features (cuckoo/VM files/process/reg/connections)
-+ Hide thread listing
 + Handle machine poweroff
 + Add monitored functions/events
 + Handle file deletion
-+ Log registry callbacks return values
 + win7 x86 support
 + x64 support (get rid of SSDT hooks)
 + Handle SSDT hooks race conditions (perform legitimate calls with copied parameters)
++ fix random socket desynch
 + etc.
 
 v0.3 changes :
