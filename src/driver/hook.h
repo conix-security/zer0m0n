@@ -73,34 +73,6 @@
 #define READVIRTUALMEMORY_INDEX 0xBA
 #define RESUMETHREAD_INDEX 0xC
 
-// Syscalls numbers (Seven)
-#define CREATETHREAD_WIN7_INDEX 0x57
-#define SETCONTEXTTHREAD_WIN7_INDEX 0x13C
-#define QUEUEAPCTHREAD_WIN7_INDEX 0x10D
-#define SYSTEMDEBUGCONTROL_WIN7_INDEX 0x170
-#define CREATEPROCESS_WIN7_INDEX 0x4F
-#define CREATEPROCESSEX_WIN7_INDEX 0x50
-#define MAPVIEWOFSECTION_WIN7_INDEX 0xA8
-#define WRITEVIRTUALMEMORY_WIN7_INDEX 0x18F
-#define DEBUGACTIVEPROCESS_WIN7_INDEX 0x60
-#define OPENPROCESS_WIN7_INDEX 0xBE
-#define OPENTHREAD_WIN7_INDEX 0xC6
-#define QUERYSYSTEMINFORMATION_WIN7_INDEX 0x105
-#define CREATEFILE_WIN7_INDEX 0x42
-#define READFILE_WIN7_INDEX 0x111
-#define WRITEFILE_WIN7_INDEX 0x18C
-#define DELETEFILE_WIN7_INDEX 0x66
-#define SETINFORMATIONFILE_WIN7_INDEX 0x149
-#define QUERYINFORMATIONFILE_WIN7_INDEX 0xE7
-#define CREATEMUTANT_WIN7_INDEX 0x4A
-#define DEVICEIOCONTROLFILE_WIN7_INDEX 0x6B
-#define TERMINATEPROCESS_WIN7_INDEX 0x172
-#define DELAYEXECUTION_WIN7_INDEX 0x62
-#define QUERYVALUEKEY_WIN7_INDEX 0x10A
-#define QUERYATTRIBUTESFILE_WIN7_INDEX 0xD9
-#define READVIRTUALMEMORY_WIN7_INDEX 0x115
-#define RESUMETHREAD_WIN7_INDEX 0x130
-
 
 typedef struct _ServiceDescriptorEntry {
      unsigned int *ServiceTableBase;
@@ -288,16 +260,6 @@ VOID hook_ssdt_entries();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Installs SSDT hooks (Win7 version)
-//	Parameters :
-//		None
-//	Return value :
-//		None
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-VOID hook_ssdt_entries7();
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
 //		Removes SSDT hooks (XP version)
 //	Parameters :
 //		None
@@ -305,16 +267,6 @@ VOID hook_ssdt_entries7();
 //		None
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID unhook_ssdt_entries();
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Removes SSDT hooks. (Win7 version)
-//	Parameters :
-//		None
-//	Return value :
-//		None
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-VOID unhook_ssdt_entries7();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :

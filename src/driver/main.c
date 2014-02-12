@@ -86,12 +86,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	NTSTATUS status;
 	ULONG i;
 	
-	// get os version (XP or 7 ?)
-	if(RtlIsNtDdiVersionAvailable(NTDDI_WIN7))
-		os_version = seven;
-	else
-		os_version = xp;
-	
 	// import some functions we will need
 	RtlInitUnicodeString(&function, L"ZwQueryInformationThread");
 	ZwQueryInformationThread = MmGetSystemRoutineAddress(&function);
@@ -172,16 +166,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	status = PsSetLoadImageNotifyRoutine(imageCallback);
 	if(!NT_SUCCESS(status))
 		return status;
-	
-	if(os_version == xp)
-		hook_ssdt_entries();
 
-	
-	/* still very unstable
-	else
-		hook_ssdt_entries7();
-	*/
-	
+	hook_ssdt_entries();	
+
 	pDriverObject->DriverUnload = Unload;
 
 	return STATUS_SUCCESS;
@@ -197,12 +184,8 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID Unload(PDRIVER_OBJECT pDriverObject)
 {
-	if(os_version == xp)
-		unhook_ssdt_entries();
-	/* still very unstable
-	else 
-		unhook_ssdt_entries7();
-	*/
+	unhook_ssdt_entries();
+	
 	CmUnRegisterCallback(cookie);
 	PsRemoveLoadImageNotifyRoutine(imageCallback);
 	
