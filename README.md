@@ -4,7 +4,6 @@ zer0m0n v0.4 (DEVELOPMENT BRANCH)
 To-do :
 + Eliminate bugs :]
 + Cr0 reg trick => multiprocessor issues.
-+ Get ZwCreateProcess* filename parameter
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
 + Add anti-detection features (cuckoo/VM files/process/reg/connections)
 + Handle machine poweroff
@@ -18,7 +17,7 @@ To-do :
 
 v0.4 changes :
 + more anti VM detection features
-+ log process creation name through ZwCreateSection hook 
++ log new loaded modules through ZwCreateSection hook 
 
 v0.3 changes :
 + fix minor bugs
