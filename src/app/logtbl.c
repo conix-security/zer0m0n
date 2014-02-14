@@ -223,6 +223,7 @@ const char *logtbl[] = {
     "ZwReadVirtualMemory",
     "ZwResumeThread",
     "ZwCreateSection",
+    "ZwUserCallOneParam",
     NULL
 };
 char logtbl_explained[sizeof(logtbl)/sizeof(char *)] = {0};

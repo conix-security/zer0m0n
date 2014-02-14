@@ -71,7 +71,7 @@ FLT_REGISTRATION registration =
 //		Sets IRP callbacks.
 //		Creates filter communication port to send logs from the driver to the userland process.
 //		Creates logs mutex.
-//		Hooks SSDT.
+//		Hooks SSDT and Shadow SSDT
 //		Register image load and registry callbacks.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath)
@@ -91,6 +91,8 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	ZwQueryInformationThread = MmGetSystemRoutineAddress(&function);
 	RtlInitUnicodeString(&function, L"ZwQueryInformationProcess");
 	ZwQueryInformationProcess = MmGetSystemRoutineAddress(&function);
+	RtlInitUnicodeString(&function, L"ZwQuerySystemInformation");
+	ZwQuerySystemInformation = MmGetSystemRoutineAddress(&function);
 	
 	RtlInitUnicodeString(&usDriverName, L"\\Device\\DriverSSDT");
 	RtlInitUnicodeString(&usDosDeviceName, L"\\DosDevices\\DriverSSDT"); 
@@ -110,7 +112,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	
 	monitored_process_list = NULL;
 	hidden_process_list = NULL;
-	
 	
 	// initialize every function pointers to null
 	oldZwMapViewOfSection = NULL;
@@ -140,6 +141,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	oldZwReadVirtualMemory = NULL;
 	oldZwResumeThread = NULL;
 	oldZwCreateSection = NULL;
+	oldZwUserCallOneParam = NULL;
 	
    	status = FltRegisterFilter(pDriverObject,&registration,&filter);
 	if(!NT_SUCCESS(status))
@@ -168,10 +170,23 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	if(!NT_SUCCESS(status))
 		return status;
 
+	KeServiceDescriptorTableShadow = getShadowTableAddress();
+	if(!KeServiceDescriptorTableShadow)
+	{
+		#ifdef DEBUG
+		DngPrint("error : couldn't retrieve Shadow SSDT\n");
+		#endif
+		return STATUS_UNSUCCESSFUL;
+	}
+	status = PsLookupProcessByProcessId(getCsrPid(), &crsEProc);
+	if(NT_SUCCESS(status))
+		KeAttachProcess(crsEProc);
+	else
+		return status;
+	
 	hook_ssdt_entries();	
-
+	
 	pDriverObject->DriverUnload = Unload;
-
 	return STATUS_SUCCESS;
 }
  

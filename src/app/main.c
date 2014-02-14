@@ -334,8 +334,17 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 
 		// if a driver is loaded, notifies cuckoo to stop the analysis
 		if(!strcmp(log.funcname, "LOAD_DRIVER"))
+		{
+			printf("DRIVER LOADED ! Terminating analysis...\n");
 			pipe("KSUBVERT");
+		}
 
+		// if a shutdown/reboot is attempted, notifies cuckoo to stop the analysis
+		if(!strcmp(log.funcname, "ZwUserCallOneParam"))
+		{
+			printf("SHUTDOWN ATTEMPT BLOCKED !\n");
+			pipe("KSUBVERT");
+		}
 		// notifies analyzer.py that a process has terminated
 		if(!strcmp(log.funcname, "ZwTerminateProcess") && !log.ret)
 			pipe("KTERMINATE:%d", atoi(log.arguments[1].value));

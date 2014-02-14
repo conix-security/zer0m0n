@@ -44,6 +44,7 @@
 
 // SSDT entry access macro
 #define SYSTEMSERVICE(_syscall) KeServiceDescriptorTable.ServiceTableBase[_syscall]
+#define SHADOWSERVICE(_syscall) KeServiceDescriptorTableShadow[1].ServiceTableBase[_syscall]
 
 // Syscalls numbers (XP)
 #define CREATETHREAD_INDEX 0x35
@@ -73,6 +74,7 @@
 #define READVIRTUALMEMORY_INDEX 0xBA
 #define RESUMETHREAD_INDEX 0xC
 #define CREATESECTION_INDEX 0x32
+#define USERCALLONEPARAM_INDEX 0x143
 
 typedef struct _ServiceDescriptorEntry {
      unsigned int *ServiceTableBase;
@@ -82,6 +84,19 @@ typedef struct _ServiceDescriptorEntry {
  } ServiceDescriptorTableEntry, *pServiceDescriptorTableEntry;
 #pragma pack()
 
+typedef struct _SYSTEM_HANDLE_INFORMATION { 
+	ULONG ProcessId; 
+	UCHAR ObjectTypeNumber; 
+	UCHAR Flags; 
+	USHORT Handle; 
+	PVOID Object; 
+	ACCESS_MASK GrantedAccess; 
+} _SYSTEM_HANDLE_INFORMATION, *P_SYSTEM_HANDLE_INFORMATION;
+
+typedef struct _SYSTEM_HANDLE_INFORMATION_EX { 
+	ULONG NumberOfHandles; 
+	_SYSTEM_HANDLE_INFORMATION Information[1]; 
+} _SYSTEM_HANDLE_INFORMATION_EX, *PSYSTEM_HANDLE_INFORMATION_EX; 
 
 /////////////////////////////////////////////////////////////////////////////		
 // HOOKED FUNCTIONS RELATED STRUCTS
@@ -209,6 +224,7 @@ typedef NTSTATUS(*ZWQUERYATTRIBUTESFILE)(POBJECT_ATTRIBUTES, PFILE_BASIC_INFORMA
 typedef NTSTATUS(*ZWREADVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
 typedef NTSTATUS(*ZWRESUMETHREAD)(HANDLE, PULONG);
 typedef NTSTATUS(*ZWCREATESECTION)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PLARGE_INTEGER, ULONG, ULONG, HANDLE);
+typedef ULONG(*ZWUSERCALLONEPARAM)(ULONG, ULONG);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
@@ -242,13 +258,47 @@ ZWQUERYATTRIBUTESFILE oldZwQueryAttributesFile;
 ZWREADVIRTUALMEMORY oldZwReadVirtualMemory;
 ZWRESUMETHREAD oldZwResumeThread;
 ZWCREATESECTION oldZwCreateSection;
+ZWUSERCALLONEPARAM oldZwUserCallOneParam;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
+__declspec(dllimport) KeAddSystemServiceTable(ULONG,ULONG,ULONG,ULONG,ULONG);
+
+pServiceDescriptorTableEntry KeServiceDescriptorTableShadow;
 
 /////////////////////////////////////////////////////////////////////////////		
 // FUNCTIONS
 /////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Get shadow table address
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pServiceDescriptorTableEntry getShadowTableAddress();
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Retrieve info table
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+PVOID getInfoTable(ULONG);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		get csrss.exe pid in order to retrieve and modify shadow table entries
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+HANDLE getCsrPid();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -560,6 +610,16 @@ NTSTATUS newZwResumeThread(HANDLE ThreadHandle, PULONG SuspendCount);
 //		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566428%28v=vs.85%29.aspx
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwCreateSection(PHANDLE SectionHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PLARGE_INTEGER MaximumSize, ULONG SectionPageProtection, ULONG AllocationAttributes, HANDLE FileHandle);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Blocks shutdown attempts through ExWindowsEx
+//	Parameters :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallOneParam
+//	Return value :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallOneParam
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ULONG newZwUserCallOneParam(ULONG Param, ULONG Routine);
 
 
 #endif

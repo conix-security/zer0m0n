@@ -131,6 +131,9 @@ VOID unhook_ssdt_entries()
 	if(oldZwCreateSection != NULL)
 		(ZWCREATESECTION)SYSTEMSERVICE(CREATESECTION_INDEX) = oldZwCreateSection;
 		
+	if(oldZwUserCallOneParam != NULL)
+		(ZWUSERCALLONEPARAM)SHADOWSERVICE(USERCALLONEPARAM_INDEX) = oldZwUserCallOneParam;
+	
 	enable_cr0();
 }
 
@@ -229,10 +232,121 @@ VOID hook_ssdt_entries()
 	
 	oldZwCreateSection = (ZWCREATESECTION)SYSTEMSERVICE(CREATESECTION_INDEX);
 	(ZWCREATESECTION)SYSTEMSERVICE(CREATESECTION_INDEX) = newZwCreateSection;
-
+	
+	oldZwUserCallOneParam = (ZWUSERCALLONEPARAM)SHADOWSERVICE(USERCALLONEPARAM_INDEX);
+	(ZWUSERCALLONEPARAM)SHADOWSERVICE(USERCALLONEPARAM_INDEX) = newZwUserCallOneParam;
+		
 	enable_cr0();
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Retrieve info table
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+PVOID getInfoTable(ULONG ATableType)   
+{   
+  ULONG mSize = 0x4000;   
+  PVOID mPtr = NULL;   
+  NTSTATUS St;   
+  
+  do   
+  {   
+     mPtr = ExAllocatePool(PagedPool, mSize);   
+     memset(mPtr, 0, mSize);   
+     if (mPtr)     
+        St = ZwQuerySystemInformation(ATableType, mPtr, mSize, NULL);   
+	 else 
+		return NULL;   
+     if (St == STATUS_INFO_LENGTH_MISMATCH)   
+     {   
+        ExFreePool(mPtr);   
+        mSize = mSize * 2;   
+     }   
+  } while (St == STATUS_INFO_LENGTH_MISMATCH);   
+
+  if(NT_SUCCESS(St)) 
+	return mPtr;   
+  
+  ExFreePool(mPtr);   
+  return NULL;   
+}   
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		get csrss.exe pid in order to retrieve and modify shadow table entries
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+HANDLE getCsrPid()   
+{   
+    HANDLE Process, hObject;   
+    HANDLE CsrId = (HANDLE)0;   
+    OBJECT_ATTRIBUTES obj;   
+    CLIENT_ID cid;   
+    UCHAR Buff[0x100];   
+    POBJECT_NAME_INFORMATION ObjName = (PVOID)&Buff;   
+    PSYSTEM_HANDLE_INFORMATION_EX Handles = NULL;   
+    ULONG r;   
+   
+    Handles = getInfoTable(SystemHandleInformation);   
+    if (!Handles)
+		return CsrId;   
+   
+    for (r = 0; r < Handles->NumberOfHandles; r++)   
+    {   
+        if (Handles->Information[r].ObjectTypeNumber == 21) //Port object   
+        {   
+            InitializeObjectAttributes(&obj, NULL, OBJ_KERNEL_HANDLE, NULL, NULL);   
+   
+            cid.UniqueProcess = (HANDLE)Handles->Information[r].ProcessId;   
+            cid.UniqueThread = 0;   
+   
+            if (NT_SUCCESS(NtOpenProcess(&Process, PROCESS_DUP_HANDLE, &obj, &cid)))   
+            {   
+                if (NT_SUCCESS(ZwDuplicateObject(Process, (HANDLE)Handles->Information[r].Handle,NtCurrentProcess(), &hObject, 0, 0, DUPLICATE_SAME_ACCESS)))   
+                {   
+                    if (NT_SUCCESS(ZwQueryObject(hObject, ObjectNameInformation, ObjName, 0x100, NULL)))   
+                    {   
+                        if (ObjName->Name.Buffer && !wcsncmp(L"\\Windows\\ApiPort", ObjName->Name.Buffer, 20))             
+                          CsrId = (HANDLE)Handles->Information[r].ProcessId;   
+                    }   
+                    ZwClose(hObject);   
+                }   
+                ZwClose(Process);   
+            }   
+        }   
+    }   
+    ExFreePool(Handles);   
+    return CsrId;   
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		get Shadow table address
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//  Process :
+//      search in KeAddSystemServiceTable for LEA opcode, the first one will the one with the shadow table address,
+//		returns that address
+////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
+pServiceDescriptorTableEntry getShadowTableAddress()   
+{   
+	PUCHAR c;
+	for(c = (PUCHAR)&KeAddSystemServiceTable; c < (PUCHAR)&KeAddSystemServiceTable + PAGE_SIZE; c++)
+	{
+		if(*(PUSHORT)c == 0x888d)
+			return *(PVOID*)(c+2);
+	}
+	return NULL;
+}   
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -2662,6 +2776,41 @@ NTSTATUS newZwQueryAttributesFile(POBJECT_ATTRIBUTES ObjectAttributes, PFILE_BAS
 			ExFreePool(parameter);
 	}		
 	return statusCall;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Blocks shutdown attempts through ExWindowsEx
+//	Parameters :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallOneParam
+//	Return value :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallOneParam
+// 	Process :
+//		if Routine == 0x34 // PrepareForLogoff , block the call, log it with the parameters
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ULONG newZwUserCallOneParam(ULONG Param, ULONG Routine)
+{
+	ULONG currentProcessId;
+	PWCHAR parameter = NULL;
+		
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		if(Routine == 0x34)
+		{
+			parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ss,Param->0x%08x,Routine->0x%08x", Param, Routine)))
+				sendLogs(currentProcessId, L"ZwUserCallOneParam", parameter);
+			else
+				sendLogs(currentProcessId, L"ZwUserCallOneParam", L"1,0,ss,Param->ERROR,Routine->ERROR");				
+			if(parameter)
+				ExFreePool(parameter);
+			cleanMonitoredProcessList();	
+			return 0;	
+		}
+	}
+	return ((ZWUSERCALLONEPARAM)(oldZwUserCallOneParam))(Param, Routine);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
