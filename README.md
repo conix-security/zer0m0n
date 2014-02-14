@@ -6,7 +6,6 @@ To-do :
 + Cr0 reg trick => multiprocessor issues.
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
 + Add anti-detection features (cuckoo/VM files/process/reg/connections)
-+ Handle machine poweroff
 + Add monitored functions/events
 + Handle file deletion
 + win7 x86 support
@@ -18,6 +17,7 @@ To-do :
 v0.4 changes :
 + more anti VM detection features
 + log new loaded modules through ZwCreateSection hook 
++ handle shutdown attempt through ExitWindowsEx() in hooking NtUserCallOneParam() (shadow ssdt) => abort analysis
 
 v0.3 changes :
 + fix minor bugs
