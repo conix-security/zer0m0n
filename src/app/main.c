@@ -313,7 +313,8 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 				retrieve_parameters(log.nb_arguments, msg->message, ptr_msg, size, log.arguments);
 				i = log_resolve_index(log.funcname, 0);
 				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value,log.arguments[5].arg,log.arguments[5].value,log.arguments[6].arg,log.arguments[6].value);
-		
+			break;
+			
 			default:
 				break;
 		}			
