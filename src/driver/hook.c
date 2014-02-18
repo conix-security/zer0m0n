@@ -255,7 +255,7 @@ PVOID getInfoTable(ULONG ATableType)
   
   do   
   {   
-     mPtr = ExAllocatePool(PagedPool, mSize);   
+     mPtr = ExAllocatePoolWithTag(PagedPool, mSize, BUF_POOL_TAG);   
      memset(mPtr, 0, mSize);   
      if (mPtr)     
         St = ZwQuerySystemInformation(ATableType, mPtr, mSize, NULL);   
@@ -403,7 +403,8 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 					sendLogs(currentProcessId, L"ZwOpenThread", parameter);
 				else
 					sendLogs(currentProcessId, L"ZwOpenThread", L"0,-1,sss,ThreadHandle->ERROR,TID->ERROR,DesiredAccess->1");
-				ExFreePool(parameter);
+				if(parameter)
+					ExFreePool(parameter);
 				return statusCall;
 			}
 		
@@ -420,6 +421,7 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 					sendLogs(currentProcessId, L"ZwOpenThread", parameter);
 				else
 					sendLogs(currentProcessId, L"ZwOpenThread", L"0,3221225485,sss,ThreadHandle->ERROR,TID->ERROR,DesiredAccess->ERROR");
+				ExFreePool(parameter);
 				return STATUS_INVALID_PARAMETER;
 			}
 			
@@ -2662,6 +2664,21 @@ NTSTATUS newZwQueryValueKey(HANDLE KeyHandle, PUNICODE_STRING ValueName, KEY_VAL
 						}
 					}
 				}
+				
+				else if(!_wcsicmp(nameInfo->Name, L"\\REGISTRY\\MACHINE\\SYSTEM\\ControlSet001\\Services\\Disk\\Enum") || !_wcsicmp(nameInfo->Name, L"\\REGISTRY\\MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Disk\\Enum"))
+				{
+					if(!_wcsicmp(ValueName->Buffer, L"0"))
+					{
+						len = wcslen(L"IDE\\DiskWDC_WD3200AAKX-753CA1___________________17.01H17\\5&3cc78f3&0&0.0.0");
+						if(KeyValueInformation && RtlStringCchPrintfW(((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Name, len, L"IDE\\DiskWDC_WD3200AAKX-753CA1___________________17.01H17\\5&3cc78f3&0&0.0.0"))
+						{
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->Type = 1;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->TitleIndex = 0;
+							((PKEY_VALUE_BASIC_INFORMATION)KeyValueInformation)->NameLength = len;
+						}
+					}
+				}
+				
 				if(nameInfo)
 					ExFreePool(nameInfo);
 			}
