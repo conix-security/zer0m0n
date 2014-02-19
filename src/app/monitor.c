@@ -34,6 +34,36 @@
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
+//		Removes all of the monitored list entries (stops monitoring).
+//	Parameters :
+//		None
+//	Return value :
+//		int : 1 if no error was encountered, otherwise, returns -1.	
+//	Process :
+//		Walks through the linked list and removes each entry.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+int cleanMonitoredProcessList()
+{
+	PMONITORED_PROCESS_ENTRY currentMember, tempMember;
+	
+	if(monitored_process_list == NULL)
+		return 1;
+	
+	currentMember = monitored_process_list;
+	tempMember = NULL;
+	while(currentMember != NULL)
+	{
+		tempMember = currentMember;
+		currentMember = (PMONITORED_PROCESS_ENTRY)(currentMember->flink);
+		free(tempMember);
+	}
+	
+	monitored_process_list = NULL;
+	return 1;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
 //		Adds "pid" process in the monitored list and its associated socket id(starts monitoring this process).
 //	Parameters :
 //		_in_ ULONG new_pid : Process Identifier.

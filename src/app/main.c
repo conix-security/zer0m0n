@@ -17,8 +17,7 @@
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with Zer0m0n.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  along with Zer0m0n.  If not, see <http://www.gnu.org/licenses/>.//
 //
 //	File :		main.c
 //	Abstract :	Main function for zer0m0n 
@@ -54,7 +53,7 @@ int main(int argc, char **argv)
 	HANDLE hThreads[NUMBER_OF_THREADS];
 	int i;
 	init = 0;
-	
+
 	RtlInitUnicodeString = (RTLINITUNICODESTRING)GetProcAddress(LoadLibrary("ntdll.dll"), "RtlInitUnicodeString");
 	if(RtlInitUnicodeString == NULL)
 		return -1;
@@ -105,6 +104,7 @@ int main(int argc, char **argv)
 	}
 }
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description : retrieve logs from kernel, parse them and send them to the cuckoo machine host
 //
@@ -134,6 +134,7 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 	HRESULT hr;
 
 	context = *p;
+	i=0, j=0;
 	
 	log.funcname = NULL;
 	log.procname = NULL;
@@ -265,7 +266,7 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		if(log.nb_arguments)
 			log.arguments = (PARAMETERS*)malloc(log.nb_arguments * sizeof(PARAMETERS));
 		
-		// for the moment, we only have 3 arguments/values maximum to log
+		// for the moment, we only have 7 arguments/values maximum to log
 		switch(log.nb_arguments)
 		{
 			case 0:
@@ -290,34 +291,34 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 				i = log_resolve_index(log.funcname, 0);
 				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value);
 			break;
-			
+
 			case 4:
 				retrieve_parameters(log.nb_arguments, msg->message, ptr_msg, size, log.arguments);
 				i = log_resolve_index(log.funcname, 0);
 				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value);
 			break;
-			
+
 			case 5:
 				retrieve_parameters(log.nb_arguments, msg->message, ptr_msg, size, log.arguments);
 				i = log_resolve_index(log.funcname, 0);
 				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value);
 			break;
-			
+
 			case 6:
 				retrieve_parameters(log.nb_arguments, msg->message, ptr_msg, size, log.arguments);
 				i = log_resolve_index(log.funcname, 0);
 				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value,log.arguments[5].arg,log.arguments[5].value);
 			break;
-			
+
 			case 7:
 				retrieve_parameters(log.nb_arguments, msg->message, ptr_msg, size, log.arguments);
 				i = log_resolve_index(log.funcname, 0);
 				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value,log.arguments[5].arg,log.arguments[5].value,log.arguments[6].arg,log.arguments[6].value);
 			break;
-			
+
 			default:
 				break;
-		}			
+		}
 		
 		// if the log contains "ZwWriteFile" as function name, notifies cuckoo that a file has to be dumpped
 		if(!strcmp(log.funcname, "ZwWriteFile") && !log.ret)
@@ -339,8 +340,17 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 
 		// if a driver is loaded, notifies cuckoo to stop the analysis
 		if(!strcmp(log.funcname, "LOAD_DRIVER"))
+		{
+			printf("DRIVER LOADED ! Terminating analysis...\n");
 			pipe("KSUBVERT");
+		}
 
+		// if a shutdown/reboot is attempted, notifies cuckoo to stop the analysis
+		if(!strcmp(log.funcname, "ZwUserCallOneParam"))
+		{
+			printf("SHUTDOWN ATTEMPT BLOCKED !\n");
+			pipe("KSUBVERT");
+		}
 		// notifies analyzer.py that a process has terminated
 		if(!strcmp(log.funcname, "ZwTerminateProcess") && !log.ret)
 			pipe("KTERMINATE:%d", atoi(log.arguments[1].value));
@@ -360,19 +370,20 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 			free(log.fmt);
 			log.fmt = NULL;
 		}
+
 		if(log.arguments)
 		{
-			for(j = 0; j < log.nb_arguments; j++)
+			for(i=0; i<log.nb_arguments; i++)
 			{
-				if(log.arguments[j].value != NULL)
-					free(log.arguments[j].value);			
-				if(log.arguments[j].arg != NULL)
-					free(log.arguments[j].arg);
+				free(log.arguments[i].arg);
+				free(log.arguments[i].value);
 			}
 			free(log.arguments);
 			log.arguments = NULL;
 		}
+
 		memset(msg, 0, sizeof(KERNEL_MESSAGE));
 	}
 	free(msg);
+	cleanMonitoredProcessList();
 }

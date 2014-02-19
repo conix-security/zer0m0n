@@ -76,19 +76,19 @@ void retrieve_parameters(int nb_arguments, char *msg, int ptr_msg, int size, PAR
 
 	for(i=0; i<nb_arguments; i++)
 	{
-			ptr_msg += size+1;
-			size = getsize(ptr_msg, msg, 0x3E);
-			tmp[i].arg = malloc(size);
-			tmp[i].arg[size-1] = 0x0;
-			memcpy(tmp[i].arg, msg+ptr_msg, size-1);
-			ptr_msg += size+1;
-			if( i == nb_arguments-1)
-				size = getsize(ptr_msg, msg, 0x00);
-			else
-				size = getsize(ptr_msg, msg, 0x2C);
-			tmp[i].value = malloc(size+1);
-			tmp[i].value[size] = 0x0;
-			memcpy(tmp[i].value, msg+ptr_msg, size);
+		ptr_msg += size+1;
+		size = getsize(ptr_msg, msg, 0x3E);
+		tmp[i].arg = malloc(size);
+		tmp[i].arg[size-1] = 0x0;
+		memcpy(tmp[i].arg, msg+ptr_msg, size-1);
+		ptr_msg += size+1;
+		if( i == nb_arguments-1)
+			size = getsize(ptr_msg, msg, 0x00);
+		else
+			size = getsize(ptr_msg, msg, 0x2C);
+		tmp[i].value = malloc(size+1);
+		tmp[i].value[size] = 0x0;
+		memcpy(tmp[i].value, msg+ptr_msg, size);
 	}
 }
 

@@ -216,7 +216,7 @@ NTSTATUS regCallback (PVOID CallbackContext, PVOID Argument1, PVOID Argument2)
 		case RegNtPreOpenKey:
 			if(((PREG_PRE_OPEN_KEY_INFORMATION)Argument2)->CompleteName->Buffer != NULL)
 			{
-				if(!_wcsicmp(((PREG_PRE_OPEN_KEY_INFORMATION)Argument2)->CompleteName->Buffer, L"SOFTWARE\\Oracle\\VirtualBox Guest Additions"))
+				if(!_wcsicmp(((PREG_PRE_OPEN_KEY_INFORMATION)Argument2)->CompleteName->Buffer, L"SOFTWARE\\Oracle\\VirtualBox Guest Additions") || !_wcsicmp(((PREG_PRE_OPEN_KEY_INFORMATION)Argument2)->CompleteName->Buffer, L"SOFTWARE\\VMware, Inc.\\VMware Tools"))
 				{
 					if(NT_SUCCESS(RtlStringCchPrintfW(pwBuf, MAXSIZE, L"0,0,s,SubKey->%wZ", ((PREG_PRE_OPEN_KEY_INFORMATION)Argument2)->CompleteName)))
 						sendLogs(pid,L"REGISTRY_OPEN_KEY", pwBuf);

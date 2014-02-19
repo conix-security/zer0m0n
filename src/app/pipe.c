@@ -117,26 +117,26 @@ static int _pipe_sprintf(char *out, const char *fmt, va_list args)
 
 int pipe(const char *fmt, ...)
 {
-	int len;
+	int len, ret;
 	va_list args;
 	char *buf;
-
     va_start(args, fmt);
+	
     len = _pipe_sprintf(NULL, fmt, args);
 	if(len > 0) {
 		buf = malloc(len+1);
         _pipe_sprintf(buf, fmt, args);
         va_end(args);
-		return CallNamedPipe(g_pipe_name, buf, len, buf, len,
-			(unsigned long *) &len, NMPWAIT_WAIT_FOREVER);
+		ret = CallNamedPipe(g_pipe_name, buf, len, buf, len, (unsigned long *) &len, NMPWAIT_WAIT_FOREVER);
 		free(buf);
+		return ret;
 	}
     return -1;
 }
 
 int pipe2(void *out, int *outlen, const char *fmt, ...)
 {
-	int len;
+	int len, ret;
 	char *buf;
     va_list args;
     va_start(args, fmt);
@@ -145,10 +145,9 @@ int pipe2(void *out, int *outlen, const char *fmt, ...)
         buf = malloc(len+1);
         _pipe_sprintf(buf, fmt, args);
         va_end(args);
-	
-		free(buf);
-        return CallNamedPipe(g_pipe_name, buf, len, out, *outlen,
+		ret = CallNamedPipe(g_pipe_name, buf, len, out, *outlen,
 			(DWORD *) outlen, NMPWAIT_WAIT_FOREVER);
+		free(buf);
     }
     return -1;
 }

@@ -1,4 +1,4 @@
-zer0m0n v0.3
+zer0m0n v0.4
 ============
 
 zer0m0n is a driver for Cuckoo Sandbox, it will perform kernel analysis during the execution of a malware. There are many ways for a malware author to bypass Cuckoo detection, he can detect the hooks, hardcodes the Nt* functions to avoid the hooks, detect the virtual machine... The goal of this driver is to offer the possibility for the user to choose between the classical userland analysis or a kernel analysis, which will be harder to detect or bypass.
@@ -7,6 +7,13 @@ Actually, it only works for XP 32 bit Windows machines, because of SSDT hooks us
 
 CHANGELOG
 =========
+
+v0.4
++ bug fixes
++ more anti VM detection features
++ log new loaded modules through ZwCreateSection() hook
++ shadow ssdt hook
++ handle shutdown attempt through ExitWindowsEx() => abort analysis
 
 v0.3
 + fix minor bugs

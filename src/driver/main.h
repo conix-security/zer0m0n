@@ -80,11 +80,12 @@
 
 typedef NTSTATUS (*ZWQUERYINFORMATIONPROCESS)(HANDLE,ULONG,PVOID,ULONG,PULONG);
 typedef NTSTATUS (*ZWQUERYINFORMATIONTHREAD)(HANDLE,ULONG,PVOID,ULONG,PULONG);
+typedef NTSTATUS(*ZWQUERYSYSTEMINFORMATION)(SYSTEM_INFORMATION_CLASS, PVOID, ULONG, PULONG);
 
 // specific imports
 ZWQUERYINFORMATIONPROCESS ZwQueryInformationProcess;
 ZWQUERYINFORMATIONTHREAD ZwQueryInformationThread;
-
+ZWQUERYSYSTEMINFORMATION ZwQuerySystemInformation;
 
 /////////////////////////////////////////////////////////////////////////////
 // GLOBALS 
@@ -104,6 +105,7 @@ PFLT_PORT clientPort;
 // Dos device driver name
 UNICODE_STRING usDosDeviceName;
 
+PEPROCESS crsEProc;
 
 /////////////////////////////////////////////////////////////////////////////
 // FUNCTIONS

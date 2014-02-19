@@ -231,7 +231,10 @@ NTSTATUS parse_pids(PCHAR pids)
 					first_pid=FALSE;
 				}
 				else
-					addHiddenProcess(pid);
+				{
+					if(pid)
+						addHiddenProcess(pid);
+				}
 			}
 			start = current+1;
 		}
@@ -284,6 +287,9 @@ NTSTATUS ioctl_DeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	switch(pIoStackIrp->Parameters.DeviceIoControl.IoControlCode)
 	{
 		case IOCTL_PID:		
+			// for tests only
+			//pid = *(ULONG*)Irp->AssociatedIrp.SystemBuffer; 
+			
 			// parse the pids received from cuckoo
 			status = parse_pids(Irp->AssociatedIrp.SystemBuffer);
 		
