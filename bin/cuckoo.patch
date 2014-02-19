@@ -1,6 +1,6 @@
 diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.py
 --- original/analyzer/windows/analyzer.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/analyzer.py	2014-02-18 19:37:30.491146131 +0100
++++ new/analyzer/windows/analyzer.py	2014-02-19 17:19:12.541287513 +0100
 @@ -64,6 +64,12 @@ def add_pid(pid):
          log.info("Added new process to list with pid: %s", pid)
          PROCESS_LIST.append(pid)
@@ -117,7 +117,7 @@ diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.p
  
 diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib/api/process.py
 --- original/analyzer/windows/lib/api/process.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/lib/api/process.py	2014-02-18 19:37:30.627812804 +0100
++++ new/analyzer/windows/lib/api/process.py	2014-02-19 17:19:12.544620817 +0100
 @@ -5,14 +5,16 @@
  import os
  import logging
@@ -281,7 +281,7 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
      def wait(self):
 diff -rupN original/analyzer/windows/lib/common/defines.py new/analyzer/windows/lib/common/defines.py
 --- original/analyzer/windows/lib/common/defines.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/lib/common/defines.py	2014-02-18 19:40:32.551153067 +0100
++++ new/analyzer/windows/lib/common/defines.py	2014-02-19 17:19:12.544620817 +0100
 @@ -74,6 +74,8 @@ WM_GETTEXT                = 0x0000000D
  WM_GETTEXTLENGTH          = 0x0000000E
  BM_CLICK                  = 0x000000F5
@@ -314,7 +314,7 @@ diff -rupN original/analyzer/windows/lib/common/defines.py new/analyzer/windows/
          ("LowPart", DWORD),
 diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/windows/modules/packages/applet.py
 --- original/analyzer/windows/modules/packages/applet.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/applet.py	2014-02-18 19:37:30.587812802 +0100
++++ new/analyzer/windows/modules/packages/applet.py	2014-02-19 17:19:12.544620817 +0100
 @@ -50,6 +50,9 @@ class Applet(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -342,7 +342,7 @@ diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/win
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/windows/modules/packages/bin.py
 --- original/analyzer/windows/modules/packages/bin.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/bin.py	2014-02-18 19:37:30.584479469 +0100
++++ new/analyzer/windows/modules/packages/bin.py	2014-02-19 17:19:12.544620817 +0100
 @@ -11,8 +11,12 @@ class Shellcode(Package):
      def start(self, path):
          p = Process()
@@ -360,7 +360,7 @@ diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/window
          return p.pid
 diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/windows/modules/packages/cpl.py
 --- original/analyzer/windows/modules/packages/cpl.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/cpl.py	2014-02-18 19:37:30.584479469 +0100
++++ new/analyzer/windows/modules/packages/cpl.py	2014-02-19 17:19:12.544620817 +0100
 @@ -26,18 +26,22 @@ class CPL(Package):
  
          dll = self.options.get("dll", None)
@@ -388,7 +388,7 @@ diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/windows/modules/packages/dll.py
 --- original/analyzer/windows/modules/packages/dll.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/dll.py	2014-02-18 19:37:30.587812802 +0100
++++ new/analyzer/windows/modules/packages/dll.py	2014-02-19 17:19:12.544620817 +0100
 @@ -14,6 +14,9 @@ class Dll(Package):
          function = self.options.get("function", "DllMain")
          arguments = self.options.get("arguments", None)
@@ -417,7 +417,7 @@ diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/windows/modules/packages/doc.py
 --- original/analyzer/windows/modules/packages/doc.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/doc.py	2014-02-18 19:37:30.581146135 +0100
++++ new/analyzer/windows/modules/packages/doc.py	2014-02-19 17:19:12.544620817 +0100
 @@ -37,17 +37,22 @@ class DOC(Package):
  
          dll = self.options.get("dll", None)
@@ -445,7 +445,7 @@ diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/windows/modules/packages/exe.py
 --- original/analyzer/windows/modules/packages/exe.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/exe.py	2014-02-18 19:37:30.581146135 +0100
++++ new/analyzer/windows/modules/packages/exe.py	2014-02-19 17:19:12.544620817 +0100
 @@ -13,17 +13,21 @@ class Exe(Package):
          free = self.options.get("free", False)
          args = self.options.get("arguments", None)
@@ -472,7 +472,7 @@ diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/window
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/windows/modules/packages/generic.py
 --- original/analyzer/windows/modules/packages/generic.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/generic.py	2014-02-18 19:37:30.587812802 +0100
++++ new/analyzer/windows/modules/packages/generic.py	2014-02-19 17:19:12.544620817 +0100
 @@ -14,6 +14,9 @@ class Genric(Package):
      def start(self, path):
          free = self.options.get("free", False)
@@ -501,7 +501,7 @@ diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/wi
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windows/modules/packages/html.py
 --- original/analyzer/windows/modules/packages/html.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/html.py	2014-02-18 19:37:30.587812802 +0100
++++ new/analyzer/windows/modules/packages/html.py	2014-02-19 17:19:12.544620817 +0100
 @@ -14,6 +14,9 @@ class HTML(Package):
      def start(self, path):
          free = self.options.get("free", False)
@@ -530,7 +530,7 @@ diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windo
          else:
 diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows/modules/packages/ie.py
 --- original/analyzer/windows/modules/packages/ie.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/ie.py	2014-02-18 19:37:30.587812802 +0100
++++ new/analyzer/windows/modules/packages/ie.py	2014-02-19 17:19:12.544620817 +0100
 @@ -15,6 +15,9 @@ class IE(Package):
      def start(self, url):
          free = self.options.get("free", False)
@@ -559,7 +559,7 @@ diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows
          else:
 diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/windows/modules/packages/jar.py
 --- original/analyzer/windows/modules/packages/jar.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/jar.py	2014-02-18 19:37:30.587812802 +0100
++++ new/analyzer/windows/modules/packages/jar.py	2014-02-19 17:19:12.544620817 +0100
 @@ -33,6 +33,9 @@ class Jar(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -588,7 +588,7 @@ diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/windows/modules/packages/pdf.py
 --- original/analyzer/windows/modules/packages/pdf.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/pdf.py	2014-02-18 19:37:30.587812802 +0100
++++ new/analyzer/windows/modules/packages/pdf.py	2014-02-19 17:19:12.544620817 +0100
 @@ -34,17 +34,21 @@ class PDF(Package):
  
          dll = self.options.get("dll", None)
@@ -615,7 +615,7 @@ diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/windows/modules/packages/vbs.py
 --- original/analyzer/windows/modules/packages/vbs.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/vbs.py	2014-02-18 19:37:30.591146136 +0100
++++ new/analyzer/windows/modules/packages/vbs.py	2014-02-19 17:19:12.544620817 +0100
 @@ -33,17 +33,21 @@ class VBS(Package):
  
          dll = self.options.get("dll", None)
@@ -642,7 +642,7 @@ diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/windows/modules/packages/xls.py
 --- original/analyzer/windows/modules/packages/xls.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/xls.py	2014-02-18 19:37:30.587812802 +0100
++++ new/analyzer/windows/modules/packages/xls.py	2014-02-19 17:19:12.544620817 +0100
 @@ -36,17 +36,21 @@ class XLS(Package):
  
          dll = self.options.get("dll", None)
@@ -669,7 +669,7 @@ diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/window
          else:
 diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/windows/modules/packages/zip.py
 --- original/analyzer/windows/modules/packages/zip.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/zip.py	2014-02-18 19:37:30.587812802 +0100
++++ new/analyzer/windows/modules/packages/zip.py	2014-02-19 17:19:12.544620817 +0100
 @@ -43,17 +43,21 @@ class Zip(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
@@ -696,7 +696,7 @@ diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/window
          else:
 diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
 --- original/lib/cuckoo/common/logtbl.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/lib/cuckoo/common/logtbl.py	2014-02-18 19:37:30.924479481 +0100
++++ new/lib/cuckoo/common/logtbl.py	2014-02-19 17:19:12.551287317 +0100
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
 +	# Copyright (C) 2010-2013 Cuckoo Sandbox Developers.
@@ -747,103 +747,9 @@ diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
 +	("ZwCreateSection", "process", ("sss", "SectionHandle", "FileHandle", "FileName")),
 +	("ZwUserCallOneParam", "process", ("ss", "Param", "Routine")),
  ]
-diff -rupN original/lib/cuckoo/core/database.py new/lib/cuckoo/core/database.py
---- original/lib/cuckoo/core/database.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/lib/cuckoo/core/database.py	2014-02-18 19:37:30.904479480 +0100
-@@ -271,6 +271,7 @@ class Task(Base):
-     target = Column(Text(), nullable=False)
-     category = Column(String(255), nullable=False)
-     timeout = Column(Integer(), server_default="0", nullable=False)
-+    analysis = Column(Integer(), server_default="1", nullable=False)
-     priority = Column(Integer(), server_default="1", nullable=False)
-     custom = Column(String(255), nullable=True)
-     machine = Column(String(255), nullable=True)
-@@ -716,6 +717,7 @@ class Database(object):
-             timeout=0,
-             package="",
-             options="",
-+            analysis=1,
-             priority=1,
-             custom="",
-             machine="",
-@@ -743,6 +745,8 @@ class Database(object):
-         # Convert empty strings and None values to a valid int
-         if not timeout:
-             timeout = 0
-+        if not analysis:
-+            analysis = 1
-         if not priority:
-             priority = 1
- 
-@@ -780,6 +784,7 @@ class Database(object):
-         task.timeout = timeout
-         task.package = package
-         task.options = options
-+        task.analysis = analysis
-         task.priority = priority
-         task.custom = custom
-         task.machine = machine
-@@ -821,6 +826,7 @@ class Database(object):
-                  timeout=0,
-                  package="",
-                  options="",
-+                 analysis=1,
-                  priority=1,
-                  custom="",
-                  machine="",
-@@ -849,6 +855,8 @@ class Database(object):
-         # Convert empty strings and None values to a valid int
-         if not timeout:
-             timeout = 0
-+        if not analysis:
-+            analysis = 1
-         if not priority:
-             priority = 1
- 
-@@ -856,6 +864,7 @@ class Database(object):
-                         timeout,
-                         package,
-                         options,
-+                        analysis,
-                         priority,
-                         custom,
-                         machine,
-@@ -870,6 +879,7 @@ class Database(object):
-                 timeout=0,
-                 package="",
-                 options="",
-+                analysis=1,
-                 priority=1,
-                 custom="",
-                 machine="",
-@@ -896,6 +906,8 @@ class Database(object):
-         # Convert empty strings and None values to a valid int
-         if not timeout:
-             timeout = 0
-+        if not analysis:
-+            analysis = 1
-         if not priority:
-             priority = 1
-         
-@@ -903,6 +915,7 @@ class Database(object):
-                         timeout,
-                         package,
-                         options,
-+                        analysis,
-                         priority,
-                         custom,
-                         machine,
-@@ -949,6 +962,7 @@ class Database(object):
-                    task.timeout,
-                    task.package,
-                    task.options,
-+                   task.analysis,
-                    task.priority,
-                    task.custom,
-                    task.machine,
 diff -rupN original/modules/processing/behavior.py new/modules/processing/behavior.py
 --- original/modules/processing/behavior.py	2014-01-09 15:47:55.000000000 +0100
-+++ new/modules/processing/behavior.py	2014-02-18 19:37:30.834479478 +0100
++++ new/modules/processing/behavior.py	2014-02-19 17:19:12.547954065 +0100
 @@ -329,6 +329,20 @@ class Summary:
              name = self._check_registry(registry, subkey, handle)
              if name and name not in self.keys:
@@ -867,7 +773,7 @@ diff -rupN original/modules/processing/behavior.py new/modules/processing/behavi
              subkey = ""
 diff -rupN original/web/submission/views.py new/web/submission/views.py
 --- original/web/submission/views.py	2014-01-09 15:47:49.000000000 +0100
-+++ new/web/submission/views.py	2014-02-18 19:37:31.011146151 +0100
++++ new/web/submission/views.py	2014-02-19 17:19:12.554620534 +0100
 @@ -26,6 +26,7 @@ def index(request):
          package = request.POST.get("package", "")
          timeout = force_int(request.POST.get("timeout"))
@@ -888,25 +794,9 @@ diff -rupN original/web/submission/views.py new/web/submission/views.py
          if "sample" in request.FILES:
              # Preventive checks.
              if request.FILES["sample"].size == 0:
-@@ -62,6 +68,7 @@ def index(request):
-                                   package=package,
-                                   timeout=timeout,
-                                   options=options,
-+                                  analysis=analysis,
-                                   priority=priority,
-                                   machine=machine,
-                                   custom=custom,
-@@ -90,6 +97,7 @@ def index(request):
-                                  package=package,
-                                  timeout=timeout,
-                                  options=options,
-+                                 analysis=analysis,
-                                  priority=priority,
-                                  machine=machine,
-                                  custom=custom,
 diff -rupN original/web/templates/submission/index.html new/web/templates/submission/index.html
 --- original/web/templates/submission/index.html	2014-01-09 15:47:49.000000000 +0100
-+++ new/web/templates/submission/index.html	2014-02-18 19:37:30.981146150 +0100
++++ new/web/templates/submission/index.html	2014-02-19 17:19:12.554620534 +0100
 @@ -101,6 +101,15 @@ $(document).ready( function() {
                                  <label for="form_options">Options</label>
                                  <input type="text" class="form-control" id="form_options" name="options" />
