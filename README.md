@@ -1,11 +1,10 @@
-zer0m0n v0.4 (DEVELOPMENT BRANCH)
+zer0m0n v0.5 (DEVELOPMENT BRANCH)
 =================================
 
 To-do :
 + Eliminate bugs :]
 + Cr0 reg trick => multiprocessor issues.
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
-+ Add anti-detection features (cuckoo/VM files/process/reg/connections)
 + Add monitored functions/events
 + Handle file deletion
 + win7 x86 support
@@ -13,6 +12,8 @@ To-do :
 + Handle SSDT hooks race conditions (perform legitimate calls with copied parameters)
 + fix random socket desynch
 + etc.
+
+v0.5 changes :
 
 v0.4 changes :
 + more anti VM detection features
