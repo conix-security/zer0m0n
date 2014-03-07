@@ -48,35 +48,33 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID imageCallback(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_INFO ImageInfo)
 {	
-	NTSTATUS status = STATUS_SUCCESS;
-	PWCHAR pwBuf = NULL;
-	ULONG pid = 0;
+	NTSTATUS status;
+	PWCHAR parameter = NULL;
+	ULONG currentProcessId;
 
-	if(ImageInfo != NULL)
+	if(ImageInfo)
 	{
-		pid = (ULONG)PsGetCurrentProcessId();
+		currentProcessId = (ULONG)PsGetCurrentProcessId();
 		
 		if(monitored_process_list && ImageInfo->SystemModeImage)
 		{
-			pwBuf = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), BUF_POOL_TAG);
-			if(!pwBuf)
+			parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), BUF_POOL_TAG);
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,s,DriverName->%wZ", FullImageName)))
 			{
-				sendLogs(pid,L"LOAD_DRIVER", L"1,0,s,DriverName->undefined");
+				sendLogs(currentProcessId,L"LOAD_DRIVER", parameter);
 				cleanMonitoredProcessList();
+				ExFreePool(parameter);
 				return;
 			}
-			
-			status = RtlStringCchPrintfW(pwBuf, MAXSIZE, L"1,%d,s,DriverName->%wZ", status, FullImageName);
-			if(status != STATUS_BUFFER_OVERFLOW && status != STATUS_SUCCESS)
+			else
 			{
-				sendLogs(pid,L"LOAD_DRIVER", L"1,0,s,DriverName->undefined");
-				ExFreePool(pwBuf);
+				sendLogs(currentProcessId,L"LOAD_DRIVER", L"1,0,s,DriverName->undefined");
 				cleanMonitoredProcessList();
+				if(parameter)
+					ExFreePool(parameter);
 				return;
 			}
-			sendLogs(pid,L"LOAD_DRIVER", pwBuf);
-			ExFreePool(pwBuf);
-			cleanMonitoredProcessList();
 		}
 	}
 }
+

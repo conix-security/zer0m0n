@@ -105,7 +105,11 @@ PFLT_PORT clientPort;
 // Dos device driver name
 UNICODE_STRING usDosDeviceName;
 
+// eprocess structure for crss.exe
 PEPROCESS crsEProc;
+
+// if set to 1 : xp, otherwise, it's 7
+DWORD is_xp;
 
 /////////////////////////////////////////////////////////////////////////////
 // FUNCTIONS

@@ -71,7 +71,6 @@ FLT_REGISTRATION registration =
 //		Sets IRP callbacks.
 //		Creates filter communication port to send logs from the driver to the userland process.
 //		Creates logs mutex.
-//		Hooks SSDT and Shadow SSDT
 //		Register image load and registry callbacks.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath)
@@ -82,10 +81,11 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	UNICODE_STRING filterPortName;
 	UNICODE_STRING function;
 	OBJECT_ATTRIBUTES objAttr;
+	RTL_OSVERSIONINFOW osInfo;
 	PSECURITY_DESCRIPTOR securityDescriptor;
 	NTSTATUS status;
 	ULONG i;
-	
+
 	// import some functions we will need
 	RtlInitUnicodeString(&function, L"ZwQueryInformationThread");
 	ZwQueryInformationThread = MmGetSystemRoutineAddress(&function);
@@ -142,11 +142,38 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	oldZwResumeThread = NULL;
 	oldZwCreateSection = NULL;
 	oldZwUserCallOneParam = NULL;
+	oldZwUserCallNoParam = NULL;
+	
+	// get os version
+	if(!NT_SUCCESS(RtlGetVersion(&osInfo)))
+		return status;
+
+	// check os version	
+	if(osInfo.dwMajorVersion == 5 && osInfo.dwMinorVersion == 1) // xp 32 bits
+	{
+		is_xp = 1;
+		#ifdef DEBUG
+		DbgPrint("windows xp !\n");
+		#endif
+	}
+	else if(osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 1) // win 7
+	{
+		is_xp = 0;
+		#ifdef DEBUG
+		DbgPrint("windows 7!\n");
+		#endif
+	}
+	else
+	{
+		#ifdef DEBUG
+		DbgPrint("error : not supported os\n");
+		#endif
+		return -1;
+	}
 	
    	status = FltRegisterFilter(pDriverObject,&registration,&filter);
 	if(!NT_SUCCESS(status))
 		return status;
-	
 	
 	RtlInitUnicodeString(&filterPortName, L"\\FilterPort");
 	status = FltBuildDefaultSecurityDescriptor(&securityDescriptor, FLT_PORT_ALL_ACCESS);
@@ -169,23 +196,17 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	status = PsSetLoadImageNotifyRoutine(imageCallback);
 	if(!NT_SUCCESS(status))
 		return status;
-
+	
 	KeServiceDescriptorTableShadow = getShadowTableAddress();
+	
 	if(!KeServiceDescriptorTableShadow)
 	{
 		#ifdef DEBUG
-		DngPrint("error : couldn't retrieve Shadow SSDT\n");
+		DbgPrint("error : couldn't retrieve Shadow SSDT\n");
 		#endif
 		return STATUS_UNSUCCESSFUL;
 	}
-	status = PsLookupProcessByProcessId(getCsrPid(), &crsEProc);
-	if(NT_SUCCESS(status))
-		KeAttachProcess(crsEProc);
-	else
-		return status;
-	
-	hook_ssdt_entries();	
-	
+
 	pDriverObject->DriverUnload = Unload;
 	return STATUS_SUCCESS;
 }
@@ -200,8 +221,11 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID Unload(PDRIVER_OBJECT pDriverObject)
 {
-	unhook_ssdt_entries();
-	
+	if(is_xp)
+		unhook_ssdt_entries();
+	else
+		unhook_ssdt_entries_7();
+		
 	CmUnRegisterCallback(cookie);
 	PsRemoveLoadImageNotifyRoutine(imageCallback);
 	

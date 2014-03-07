@@ -14,6 +14,10 @@ To-do :
 + etc.
 
 v0.5 changes :
++ partial windows 7 support
++ fix critical bug
++ ZwCreateUserProcess() hook (win7)
++ ZwUserCallNoParam() hook (win7)
 
 v0.4 changes :
 + more anti VM detection features
