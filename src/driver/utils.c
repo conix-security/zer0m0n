@@ -136,7 +136,6 @@ NTSTATUS getProcNameByPID(ULONG pid, PUNICODE_STRING procName)
 }
 
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
 //		wcsstr case-insensitive version (scans "haystack" for "needle").

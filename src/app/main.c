@@ -339,7 +339,7 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		}
 
 		// if a driver is loaded, notifies cuckoo to stop the analysis
-		if(!strcmp(log.funcname, "LOAD_DRIVER") || !strcmp(log.funcname, "ZwLoadDriver"))
+		if(!strcmp(log.funcname, "LOAD_DRIVER"))
 		{
 			printf("DRIVER LOADED ! Terminating analysis...\n");
 			pipe("KSUBVERT");

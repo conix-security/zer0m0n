@@ -2733,13 +2733,13 @@ NTSTATUS newZwLoadDriver(PUNICODE_STRING DriverServiceName)
 		kDriverServiceName = *DriverServiceName;
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
-		{
-			exceptionCode = GetExceptionCode();
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,DriverName->ERROR",exceptionCode)))
-				sendLogs(currentProcessId, L"ZwLoadDriver", parameter);
-			ExFreePool(parameter);
-			return STATUS_UNSUCCESSFUL;
-		}
+	{
+		exceptionCode = GetExceptionCode();
+		if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,DriverName->ERROR",exceptionCode)))
+			sendLogs(currentProcessId, L"ZwLoadDriver", parameter);
+		ExFreePool(parameter);
+		return STATUS_UNSUCCESSFUL;
+	}
 	
 	if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,DriverName->%wZ", STATUS_UNSUCCESSFUL, &kDriverServiceName)))
 		sendLogs(currentProcessId, L"ZwLoadDriver", parameter);
