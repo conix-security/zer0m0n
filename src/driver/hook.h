@@ -48,6 +48,7 @@
 
 // Syscalls numbers (XP)
 #define CREATETHREAD_INDEX 0x35
+#define CREATETHREADEX_INDEX 0x36
 #define SETCONTEXTTHREAD_INDEX 0xD5
 #define QUEUEAPCTHREAD_INDEX 0xB4
 #define SYSTEMDEBUGCONTROL_INDEX 0xFF
@@ -79,6 +80,7 @@
 
 // Syscalls numbers (7)
 #define CREATETHREAD_7_INDEX 0x57
+#define CREATETHREADEX_7_INDEX 0x58
 #define SETCONTEXTTHREAD_7_INDEX 0x13C
 #define QUEUEAPCTHREAD_7_INDEX 0x10D
 #define SYSTEMDEBUGCONTROL_7_INDEX 0x170
@@ -240,6 +242,7 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS {
 typedef NTSTATUS(*ZWSETCONTEXTTHREAD)(HANDLE, PCONTEXT); 
 typedef NTSTATUS(*ZWMAPVIEWOFSECTION)(HANDLE, HANDLE, PVOID, ULONG_PTR, SIZE_T, PLARGE_INTEGER, PSIZE_T, SECTION_INHERIT, ULONG, ULONG);
 typedef NTSTATUS(*ZWCREATETHREAD)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, PCLIENT_ID, PCONTEXT, PINITIAL_TEB, BOOLEAN);
+typedef NTSTATUS(*ZWCREATETHREADEX)(PHANDLE, ACCESS_MASK, PVOID, HANDLE, PVOID, PVOID, BOOLEAN, ULONG, ULONG, ULONG, PVOID);
 typedef NTSTATUS(*ZWQUEUEAPCTHREAD)(HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, ULONG);
 typedef NTSTATUS(*ZWSYSTEMDEBUGCONTROL)(SYSDBG_COMMAND, PVOID, ULONG, PVOID, ULONG, PULONG);
 typedef NTSTATUS(*ZWCREATEPROCESS)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, BOOLEAN, HANDLE, HANDLE, HANDLE);
@@ -265,9 +268,11 @@ typedef NTSTATUS(*ZWQUERYATTRIBUTESFILE)(POBJECT_ATTRIBUTES, PFILE_BASIC_INFORMA
 typedef NTSTATUS(*ZWREADVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
 typedef NTSTATUS(*ZWRESUMETHREAD)(HANDLE, PULONG);
 typedef NTSTATUS(*ZWCREATESECTION)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PLARGE_INTEGER, ULONG, ULONG, HANDLE);
+typedef NTSTATUS(*ZWLOADDRIVER)(PUNICODE_STRING);
+
+// shadow ssdt
 typedef ULONG(*ZWUSERCALLONEPARAM)(ULONG, ULONG);
 typedef ULONG(*ZWUSERCALLNOPARAM)(DWORD);
-typedef NTSTATUS(*ZWLOADDRIVER)(PUNICODE_STRING);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
@@ -277,6 +282,7 @@ typedef NTSTATUS(*ZWLOADDRIVER)(PUNICODE_STRING);
 ZWMAPVIEWOFSECTION oldZwMapViewOfSection;
 ZWSETCONTEXTTHREAD oldZwSetContextThread;
 ZWCREATETHREAD oldZwCreateThread;
+ZWCREATETHREADEX oldZwCreateThreadEx;
 ZWQUEUEAPCTHREAD oldZwQueueApcThread;
 ZWCREATEPROCESS oldZwCreateProcess;
 ZWSYSTEMDEBUGCONTROL oldZwSystemDebugControl;
@@ -706,5 +712,16 @@ ULONG newZwUserCallNoParam(ULONG Routine);
 //  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566470%28v=vs.85%29.aspx
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwLoadDriver(PUNICODE_STRING DriverServiceName);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs thread creation.
+//	Parameters :
+//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
+//	Return value :
+//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwCreateThreadEx(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PVOID StartAddress, PVOID Parameter, BOOLEAN CreateSuspended, ULONG StackZeroBits, ULONG SizeOfStackCommit, ULONG SizeOfStackReserve, PVOID BytesBuffer);
+
 
 #endif

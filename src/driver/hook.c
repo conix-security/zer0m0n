@@ -83,6 +83,9 @@ VOID unhook_ssdt_entries()
 
 	if(oldZwCreateThread != NULL)
 		(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX) = oldZwCreateThread;
+		
+	if(oldZwCreateThreadEx != NULL)
+		(ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_INDEX) = oldZwCreateThreadEx;
 	
 	if(oldZwMapViewOfSection != NULL)
 		(ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_INDEX) = oldZwMapViewOfSection;
@@ -188,6 +191,9 @@ VOID unhook_ssdt_entries_7()
 
 	if(oldZwCreateThread != NULL)
 		(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX) = oldZwCreateThread;
+		
+	if(oldZwCreateThreadEx != NULL)
+		(ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_7_INDEX) = oldZwCreateThreadEx;
 	
 	if(oldZwMapViewOfSection != NULL)
 		(ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_7_INDEX) = oldZwMapViewOfSection;
@@ -303,6 +309,9 @@ VOID hook_ssdt_entries()
 	oldZwCreateThread = (ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX);
 	(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX) = newZwCreateThread;
 	
+	oldZwCreateThreadEx = (ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_INDEX);
+	(ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_INDEX) = newZwCreateThreadEx;
+	
 	oldZwSetContextThread = (ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_INDEX);
 	(ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_INDEX) = newZwSetContextThread;
 	
@@ -407,6 +416,9 @@ VOID hook_ssdt_entries_7()
 	
 	oldZwCreateThread = (ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX);
 	(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX) = newZwCreateThread;
+	
+	oldZwCreateThreadEx = (ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_7_INDEX);
+	(ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_7_INDEX) = newZwCreateThreadEx;
 	
 	oldZwSetContextThread = (ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_7_INDEX);
 	(ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_7_INDEX) = newZwSetContextThread;
@@ -548,7 +560,6 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 	ULONG currentProcessId, targetThreadId, targetProcessId;
 	USHORT log_lvl = LOG_ERROR;
 	PWCHAR parameter = NULL;
-	PETHREAD eThread = NULL;
 	
 	ULONG kUniqueThread;
 	HANDLE kThreadHandle;
@@ -587,10 +598,7 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 			}
 		
 			targetThreadId = getTIDByHandle(kThreadHandle);
-			if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)targetThreadId, &eThread)))
-				targetProcessId = *(DWORD*)((PCHAR)eThread+0x1EC);
-			else
-				targetProcessId = 0;
+			targetProcessId = getPIDByThreadHandle(kThreadHandle);
 			
 			if(isProcessHiddenByPid(targetProcessId))
 			{
@@ -1093,7 +1101,6 @@ NTSTATUS newZwWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID 
 	return statusCall;
 }
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
 //		Logs process debugging (may be used for code injection).
@@ -1387,10 +1394,8 @@ NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 NTSTATUS newZwQueueApcThread(HANDLE ThreadHandle, PIO_APC_ROUTINE ApcRoutine, PVOID ApcRoutineContext, PIO_STATUS_BLOCK ApcStatusBlock, ULONG ApcReserved)
 {
 	NTSTATUS statusCall;
-	ULONG currentProcessId, targetThreadId;
-	DWORD targetProcessId;
+	ULONG currentProcessId, targetThreadId, targetProcessId;
 	USHORT log_lvl = LOG_ERROR;
-	PETHREAD eThread = NULL;
 	PWCHAR parameter = NULL;
 	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
@@ -1403,12 +1408,8 @@ NTSTATUS newZwQueueApcThread(HANDLE ThreadHandle, PIO_APC_ROUTINE ApcRoutine, PV
 		#endif
 		
 		targetThreadId = getTIDByHandle(ThreadHandle);
+		targetProcessId = getPIDByThreadHandle(ThreadHandle);
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
-		
-		if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)targetThreadId, &eThread)))
-			targetProcessId = *(DWORD*)((PCHAR)eThread+0x1EC);
-		else
-			targetProcessId = 0;
 			
 		if(NT_SUCCESS(statusCall))
 		{
@@ -1541,6 +1542,93 @@ NTSTATUS newZwCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJ
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
+//		Logs thread creation.
+//	Parameters :
+//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
+//	Return value :
+//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
+//	Process :
+//		Gets the thread's owner, proceeds the call then adds immediately the targetProcessId to the monitored
+//		processes list if it succeeded. Then logs.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwCreateThreadEx(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PVOID StartAddress, PVOID Parameter, BOOLEAN CreateSuspended, ULONG StackZeroBits, ULONG SizeOfStackCommit, ULONG SizeOfStackReserve, PVOID BytesBuffer)
+{
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, targetProcessId, createdThreadId;
+	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
+	
+	HANDLE kThreadHandle;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	
+	targetProcessId = getPIDByHandle(ProcessHandle);	// faster than placing it after the monitored process check
+	statusCall = ((ZWCREATETHREADEX)(oldZwCreateThreadEx))(ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, StartAddress, Parameter, CreateSuspended, StackZeroBits, SizeOfStackCommit, SizeOfStackReserve, BytesBuffer);
+	
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		#ifdef DEBUG
+		DbgPrint("call ZwCreateThreadEx\n");
+		#endif
+		
+		if(NT_SUCCESS(statusCall) && targetProcessId)
+			startMonitoringProcess(targetProcessId);	// <-- RACE CONDITION
+		
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		_try
+		{
+			if(ExGetPreviousMode() != KernelMode)
+				ProbeForRead(ThreadHandle, sizeof(HANDLE), 1);
+			kThreadHandle = *ThreadHandle;
+		} 
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR", exceptionCode)))
+				sendLogs(currentProcessId, L"ZwCreateThreadEx", parameter);
+			else 
+				sendLogs(currentProcessId, L"ZwCreateThreadEx", L"0,-1,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
+			if(parameter)
+				ExFreePool(parameter);
+			return statusCall;
+		}
+		
+		createdThreadId = getTIDByHandle(kThreadHandle);
+		
+		if(NT_SUCCESS(statusCall))
+		{
+			log_lvl = LOG_SUCCESS;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssss,PID->%d,ThreadHandle->0x%08x,TID->%d,CreateSuspended->%d,DesiredAccess->0x%08x", targetProcessId, kThreadHandle, createdThreadId, CreateSuspended, DesiredAccess)))
+				log_lvl = LOG_PARAM;
+		}
+		else
+		{
+			log_lvl = LOG_ERROR;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,PID->%d,ThreadHandle->0x%08x,TID->%d,CreateSuspended->%d,DesiredAccess->0x%08x", statusCall, targetProcessId, kThreadHandle, createdThreadId, CreateSuspended, DesiredAccess)))
+				log_lvl = LOG_PARAM;
+		}
+		
+		switch(log_lvl)
+		{
+			case LOG_PARAM:
+				sendLogs(currentProcessId, L"ZwCreateThreadEx", parameter);
+			break;
+			case LOG_SUCCESS:
+				sendLogs(currentProcessId, L"ZwCreateThreadEx", L"0,-1,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
+			break;
+			default:
+				sendLogs(currentProcessId, L"ZwCreateThreadEx", L"1,0,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
+			break;
+		}
+		if(parameter != NULL)
+			ExFreePool(parameter);
+	}
+	return statusCall;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
 //		Logs section mapping (may be used for code injection).
 //	Parameters :
 //		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566481(v=vs.85).aspx
@@ -1623,11 +1711,9 @@ NTSTATUS newZwMapViewOfSection(HANDLE SectionHandle, HANDLE ProcessHandle, PVOID
 NTSTATUS newZwSetContextThread(HANDLE ThreadHandle, PCONTEXT Context)
 {
 	NTSTATUS statusCall;
-	ULONG currentProcessId, targetThreadId;
-	DWORD targetProcessId;
+	ULONG currentProcessId, targetThreadId, targetProcessId;
 	USHORT log_lvl = LOG_ERROR;
 	PWCHAR parameter = NULL;
-	PETHREAD eThread = NULL;
 	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
 	statusCall = ((ZWSETCONTEXTTHREAD)(oldZwSetContextThread))(ThreadHandle, Context);
@@ -1640,13 +1726,8 @@ NTSTATUS newZwSetContextThread(HANDLE ThreadHandle, PCONTEXT Context)
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
 		targetThreadId = getTIDByHandle(ThreadHandle);
-		
-		if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)targetThreadId, &eThread)))
-			targetProcessId = *(DWORD*)((PCHAR)eThread+0x1EC);
-		else
-			targetProcessId = -1;
-			
-			
+		targetProcessId = getPIDByThreadHandle(ThreadHandle);
+	
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;

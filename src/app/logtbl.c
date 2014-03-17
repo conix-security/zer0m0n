@@ -205,6 +205,7 @@ const char *logtbl[] = {
     "ZwCreateProcessEx",
     "ZwQueueApcThread",
     "ZwCreateThread",
+    "ZwCreateThreadEx",
     "NtMapViewOfSection",
     "ZwSetContextThread",
     "ZwSystemDebugControl",
