@@ -16,11 +16,11 @@ v0.6 changes :
 
 
 v0.5 changes :
-+ fix bugs
-+ windows 7 support
-+ ZwCreateUserProcess() hook (win7)
-+ ZwUserCallNoParam() hook (win7)
-+ ZwCreateThreadEx() hook (win7)
++ bug fixes
++ win7 support
++ ZwCreateUserProcess() hook 
++ ZwUserCallNoParam() hook 
++ ZwCreateThreadEx() hook 
 
 v0.4 changes :
 + more anti VM detection features
