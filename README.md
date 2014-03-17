@@ -7,17 +7,17 @@ To-do :
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
 + Add monitored functions/events
 + Handle file deletion
-+ win7 x86 support
 + x64 support (get rid of SSDT hooks)
 + Handle SSDT hooks race conditions (perform legitimate calls with copied parameters)
 + fix random socket desynch
 + etc.
 
 v0.5 changes :
-+ partial windows 7 support
-+ fix critical bug
++ fix bugs
++ windows 7 support
 + ZwCreateUserProcess() hook (win7)
 + ZwUserCallNoParam() hook (win7)
++ ZwCreateThreadEx() hook (win7)
 
 v0.4 changes :
 + more anti VM detection features
