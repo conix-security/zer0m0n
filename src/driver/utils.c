@@ -40,8 +40,6 @@
 //		_in_ HANDLE hThread : Thread handle.
 //	Return value :
 //		ULONG : Thread Identifier or NULL if failure.
-//	TODO :
-//		Place function retrieval at startup / dynamic import.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ULONG getTIDByHandle(HANDLE hThread)
 {
@@ -50,6 +48,25 @@ ULONG getTIDByHandle(HANDLE hThread)
 	if(hThread)
 		if(NT_SUCCESS(ZwQueryInformationThread(hThread, 0, &teb, sizeof(teb), NULL)))
 			return (ULONG)teb.ClientId.UniqueThread;
+	
+	return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Retrieves and returns the thread identifier from its handle.
+//	Parameters :
+//		_in_ HANDLE hThread : Thread handle.
+//	Return value :
+//		ULONG : Thread Identifier or NULL if failure.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ULONG getPIDByThreadHandle(HANDLE hThread)
+{
+	THREAD_BASIC_INFORMATION teb;
+	
+	if(hThread)
+		if(NT_SUCCESS(ZwQueryInformationThread(hThread, 0, &teb, sizeof(teb), NULL)))
+			return (ULONG)teb.ClientId.UniqueProcess;
 	
 	return 0;
 }
@@ -134,7 +151,6 @@ NTSTATUS getProcNameByPID(ULONG pid, PUNICODE_STRING procName)
 	ExFreePool(buffer);
 	return status;
 }
-
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -48,6 +48,7 @@
 
 // Syscalls numbers (XP)
 #define CREATETHREAD_INDEX 0x35
+#define CREATETHREADEX_INDEX 0x36
 #define SETCONTEXTTHREAD_INDEX 0xD5
 #define QUEUEAPCTHREAD_INDEX 0xB4
 #define SYSTEMDEBUGCONTROL_INDEX 0xFF
@@ -72,9 +73,43 @@
 #define QUERYVALUEKEY_INDEX 0xB1
 #define QUERYATTRIBUTESFILE_INDEX 0x8B
 #define READVIRTUALMEMORY_INDEX 0xBA
-#define RESUMETHREAD_INDEX 0xC
+#define RESUMETHREAD_INDEX 0xCE
 #define CREATESECTION_INDEX 0x32
 #define USERCALLONEPARAM_INDEX 0x143
+#define LOADDRIVER_INDEX 0x61
+
+// Syscalls numbers (7)
+#define CREATETHREAD_7_INDEX 0x57
+#define CREATETHREADEX_7_INDEX 0x58
+#define SETCONTEXTTHREAD_7_INDEX 0x13C
+#define QUEUEAPCTHREAD_7_INDEX 0x10D
+#define SYSTEMDEBUGCONTROL_7_INDEX 0x170
+#define CREATEPROCESS_7_INDEX 0x4F
+#define CREATEPROCESSEX_7_INDEX 0x50
+#define CREATEUSERPROCESS_7_INDEX 0x5D
+#define MAPVIEWOFSECTION_7_INDEX 0xa8
+#define WRITEVIRTUALMEMORY_7_INDEX 0x18F
+#define DEBUGACTIVEPROCESS_7_INDEX 0x60
+#define OPENPROCESS_7_INDEX 0xbe
+#define OPENTHREAD_7_INDEX 0xc6
+#define QUERYSYSTEMINFORMATION_7_INDEX 0x105
+#define CREATEFILE_7_INDEX 0x42
+#define READFILE_7_INDEX 0x111
+#define WRITEFILE_7_INDEX 0x18C
+#define DELETEFILE_7_INDEX 0x66
+#define SETINFORMATIONFILE_7_INDEX 0x149
+#define QUERYINFORMATIONFILE_7_INDEX 0xe7
+#define CREATEMUTANT_7_INDEX 0x4a
+#define DEVICEIOCONTROLFILE_7_INDEX 0x6b
+#define TERMINATEPROCESS_7_INDEX 0x172
+#define DELAYEXECUTION_7_INDEX 0x62
+#define QUERYVALUEKEY_7_INDEX 0x10a
+#define QUERYATTRIBUTESFILE_7_INDEX 0xd9
+#define READVIRTUALMEMORY_7_INDEX 0x115
+#define RESUMETHREAD_7_INDEX 0x130
+#define CREATESECTION_7_INDEX 0x54
+#define USERCALLNOPARAM_7_INDEX 0x14d 
+#define LOADDRIVER_7_INDEX 0x9B
 
 typedef struct _ServiceDescriptorEntry {
      unsigned int *ServiceTableBase;
@@ -195,15 +230,24 @@ typedef struct _THREAD_BASIC_INFORMATION {
     ULONG	BasePriority;
 } THREAD_BASIC_INFORMATION, *PTHREAD_BASIC_INFORMATION;
 
+typedef struct _RTL_USER_PROCESS_PARAMETERS {
+  UCHAR           Reserved1[16];
+  PVOID          Reserved2[10];
+  UNICODE_STRING ImagePathName;
+  UNICODE_STRING CommandLine;
+} RTL_USER_PROCESS_PARAMETERS, *PRTL_USER_PROCESS_PARAMETERS;
+
 
 // Functions schemes definition
 typedef NTSTATUS(*ZWSETCONTEXTTHREAD)(HANDLE, PCONTEXT); 
 typedef NTSTATUS(*ZWMAPVIEWOFSECTION)(HANDLE, HANDLE, PVOID, ULONG_PTR, SIZE_T, PLARGE_INTEGER, PSIZE_T, SECTION_INHERIT, ULONG, ULONG);
 typedef NTSTATUS(*ZWCREATETHREAD)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, PCLIENT_ID, PCONTEXT, PINITIAL_TEB, BOOLEAN);
+typedef NTSTATUS(*ZWCREATETHREADEX)(PHANDLE, ACCESS_MASK, PVOID, HANDLE, PVOID, PVOID, BOOLEAN, ULONG, ULONG, ULONG, PVOID);
 typedef NTSTATUS(*ZWQUEUEAPCTHREAD)(HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, ULONG);
 typedef NTSTATUS(*ZWSYSTEMDEBUGCONTROL)(SYSDBG_COMMAND, PVOID, ULONG, PVOID, ULONG, PULONG);
 typedef NTSTATUS(*ZWCREATEPROCESS)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, BOOLEAN, HANDLE, HANDLE, HANDLE);
 typedef NTSTATUS(*ZWCREATEPROCESSEX)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, BOOLEAN, HANDLE, HANDLE, HANDLE, HANDLE);
+typedef NTSTATUS(*ZWCREATEUSERPROCESS)(PHANDLE, PHANDLE, ACCESS_MASK, ACCESS_MASK, POBJECT_ATTRIBUTES, POBJECT_ATTRIBUTES, ULONG, ULONG, PRTL_USER_PROCESS_PARAMETERS, PVOID, PVOID);
 typedef NTSTATUS(*ZWWRITEVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
 typedef NTSTATUS(*ZWDEBUGACTIVEPROCESS)(HANDLE, HANDLE);
 typedef NTSTATUS(*ZWOPENPROCESS)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PCLIENT_ID);
@@ -224,7 +268,11 @@ typedef NTSTATUS(*ZWQUERYATTRIBUTESFILE)(POBJECT_ATTRIBUTES, PFILE_BASIC_INFORMA
 typedef NTSTATUS(*ZWREADVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
 typedef NTSTATUS(*ZWRESUMETHREAD)(HANDLE, PULONG);
 typedef NTSTATUS(*ZWCREATESECTION)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PLARGE_INTEGER, ULONG, ULONG, HANDLE);
+typedef NTSTATUS(*ZWLOADDRIVER)(PUNICODE_STRING);
+
+// shadow ssdt
 typedef ULONG(*ZWUSERCALLONEPARAM)(ULONG, ULONG);
+typedef ULONG(*ZWUSERCALLNOPARAM)(DWORD);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
@@ -234,10 +282,12 @@ typedef ULONG(*ZWUSERCALLONEPARAM)(ULONG, ULONG);
 ZWMAPVIEWOFSECTION oldZwMapViewOfSection;
 ZWSETCONTEXTTHREAD oldZwSetContextThread;
 ZWCREATETHREAD oldZwCreateThread;
+ZWCREATETHREADEX oldZwCreateThreadEx;
 ZWQUEUEAPCTHREAD oldZwQueueApcThread;
 ZWCREATEPROCESS oldZwCreateProcess;
 ZWSYSTEMDEBUGCONTROL oldZwSystemDebugControl;
 ZWCREATEPROCESSEX oldZwCreateProcessEx;
+ZWCREATEUSERPROCESS oldZwCreateUserProcess;
 ZWWRITEVIRTUALMEMORY oldZwWriteVirtualMemory;
 ZWDEBUGACTIVEPROCESS oldZwDebugActiveProcess;
 ZWOPENPROCESS oldZwOpenProcess;
@@ -259,6 +309,8 @@ ZWREADVIRTUALMEMORY oldZwReadVirtualMemory;
 ZWRESUMETHREAD oldZwResumeThread;
 ZWCREATESECTION oldZwCreateSection;
 ZWUSERCALLONEPARAM oldZwUserCallOneParam;
+ZWUSERCALLNOPARAM oldZwUserCallNoParam;
+ZWLOADDRIVER oldZwLoadDriver;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
@@ -282,23 +334,13 @@ pServiceDescriptorTableEntry getShadowTableAddress();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Retrieve info table
+//		hook SSDT and Shadow SSDT tables
 //	Parameters :
-//		None
+//		DWORD pid : python process identifier 
 //	Return value :
 //		None
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-PVOID getInfoTable(ULONG);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		get csrss.exe pid in order to retrieve and modify shadow table entries
-//	Parameters :
-//		None
-//	Return value :
-//		None
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-HANDLE getCsrPid();
+VOID hook_ssdt(ULONG pid);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -312,6 +354,16 @@ VOID hook_ssdt_entries();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
+//		Installs SSDT hooks (7 version)
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+VOID hook_ssdt_entries_7();
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
 //		Removes SSDT hooks (XP version)
 //	Parameters :
 //		None
@@ -319,6 +371,16 @@ VOID hook_ssdt_entries();
 //		None
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID unhook_ssdt_entries();
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Removes SSDT hooks (7 version)
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+VOID unhook_ssdt_entries_7();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -400,6 +462,16 @@ NTSTATUS newZwCreateProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, PO
 //		See http://www.tech-archive.net/Archive/Development/microsoft.public.win32.programmer.kernel/2004-02/0195.html (lulz)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE InheritFromProcessHandle, BOOLEAN InheritHandles, HANDLE SectionHandle, HANDLE DebugPort, HANDLE ExceptionPort, HANDLE jesaispas);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process creation.
+//	Parameters :
+//		See http://www.rohitab.com/discuss/topic/40191-ntcreateuserprocess/ (lulz)
+//	Return value :
+//		See http://www.rohitab.com/discuss/topic/40191-ntcreateuserprocess/ (lulz)
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwCreateUserProcess(PHANDLE ProcessHandle, PHANDLE ThreadHandle, ACCESS_MASK ProcessDesiredAccess, ACCESS_MASK ThreadDesiredAccess, POBJECT_ATTRIBUTES ProcessObjectAttributes, POBJECT_ATTRIBUTES ThreadObjectAttributes, ULONG ProcessFlags, ULONG ThreadFlags, PVOID ProcessParameters, PVOID CreateInfo, PVOID AttributeList);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -620,6 +692,36 @@ NTSTATUS newZwCreateSection(PHANDLE SectionHandle, ACCESS_MASK DesiredAccess, PO
 //		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallOneParam
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ULONG newZwUserCallOneParam(ULONG Param, ULONG Routine);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Blocks shutdown attempts through ExWindowsEx (on Win7)
+//	Parameters :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallNoParam
+//	Return value :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallNoParam
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ULONG newZwUserCallNoParam(ULONG Routine);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Block driver loading.
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566470%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566470%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwLoadDriver(PUNICODE_STRING DriverServiceName);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs thread creation.
+//	Parameters :
+//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
+//	Return value :
+//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwCreateThreadEx(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PVOID StartAddress, PVOID Parameter, BOOLEAN CreateSuspended, ULONG StackZeroBits, ULONG SizeOfStackCommit, ULONG SizeOfStackReserve, PVOID BytesBuffer);
 
 
 #endif

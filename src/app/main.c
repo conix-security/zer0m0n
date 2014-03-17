@@ -346,7 +346,7 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		}
 
 		// if a shutdown/reboot is attempted, notifies cuckoo to stop the analysis
-		if(!strcmp(log.funcname, "ZwUserCallOneParam"))
+		if(!strcmp(log.funcname, "ZwUserCallOneParam") || !strcmp(log.funcname, "ZwUserCallNoParam"))
 		{
 			printf("SHUTDOWN ATTEMPT BLOCKED !\n");
 			pipe("KSUBVERT");

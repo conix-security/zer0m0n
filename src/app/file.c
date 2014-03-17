@@ -9,7 +9,8 @@ void file_init()
 
 void new_file(UNICODE_STRING *obj)
 {
-    const wchar_t *str = obj->Buffer;
+	wchar_t *buf = malloc(wcslen(HDDVOL) * sizeof(wchar_t));
+    wchar_t *str = obj->Buffer;
     unsigned int len = obj->Length / sizeof(wchar_t);
 
     // if it's a path including \??\ then we can send it straight away,
@@ -22,13 +23,20 @@ void new_file(UNICODE_STRING *obj)
     else if(isalpha(str[0]) != 0 && str[1] == ':') {
         pipe("FILE_NEW:%S", len, str);
     }
-    // the filename starts with \Device\HarddiskVolume1, which is
-    // basically just C:
-    else if(!wcsnicmp(str, HDDVOL1, UNILEN(HDDVOL1))) {
-        str += UNILEN(HDDVOL1), len -= UNILEN(HDDVOL1);
-        pipe("FILE_NEW:C:%S", len, str);
-    }
+    // the filename starts with \Device\HarddiskVolume
+	else if(wcsistr(str, HDDVOL)) {
+		wcsncpy(buf, str, wcslen(HDDVOL));
+		if(wcsicmp(buf, str))
+		{
+			str += UNILEN(HDDVOL)+1; 
+			len -= UNILEN(HDDVOL);
+			pipe("FILE_NEW:C:%S", len, str);
+		}
+	}
+
+	free(buf);
 }
+
 
 static void cache_file(HANDLE file_handle, const wchar_t *path,
     unsigned int length, unsigned int attributes)
@@ -78,3 +86,30 @@ void file_close(HANDLE file_handle)
 {
     lookup_del(&g_files, (unsigned int) file_handle);
 }
+
+wchar_t *wcsistr(wchar_t *wcs1, wchar_t *wcs2)
+{
+    const wchar_t *s1, *s2;
+    const wchar_t l = towlower(*wcs2);
+    const wchar_t u = towupper(*wcs2);
+    
+    if (!*wcs2)
+        return wcs1;
+    
+    for (; *wcs1; ++wcs1)
+    {
+        if (*wcs1 == l || *wcs1 == u)
+        {
+            s1 = wcs1 + 1;
+            s2 = wcs2 + 1;
+            
+            while (*s1 && *s2 && towlower(*s1) == towlower(*s2))
+                ++s1, ++s2;
+            
+            if (!*s2)
+                return wcs1;
+        }
+    }
+ 
+    return NULL;
+} 

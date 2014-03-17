@@ -59,9 +59,9 @@ NTSTATUS startMonitoringProcess(ULONG new_pid)
 	new_entry->pid = new_pid;
 	new_entry->flink = monitored_process_list;
 	monitored_process_list = new_entry;
-	#ifdef DEBUG
+	//#ifdef DEBUG
 	DbgPrint("New PID : %d\n",new_pid);
-	#endif
+	//#endif
 	return STATUS_SUCCESS;
 }
 
@@ -82,6 +82,10 @@ NTSTATUS addHiddenProcess(ULONG new_pid)
 		return STATUS_INVALID_PARAMETER;
 	if(isProcessHiddenByPid(new_pid))
 		return STATUS_SUCCESS;
+
+	//#ifdef DEBUG
+	DbgPrint("adding pid to hide : %d\n", new_pid);	
+	//#endif
 	
 	new_entry = (PHIDDEN_PROCESS)ExAllocatePoolWithTag(NonPagedPool,sizeof(HIDDEN_PROCESS),MONIT_POOL_TAG);
 	if(new_entry == NULL)

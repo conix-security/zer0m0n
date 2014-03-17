@@ -37,6 +37,37 @@
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
+//		hook SSDT and Shadow SSDT tables
+//	Parameters :
+//		DWORD pid : python process identifier 
+//	Return value :
+//		None
+//	Process :
+//		Attach python process received from cuckoo to access Shadow SSDT and hook both SSDT and Shadow SSDT
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+VOID hook_ssdt(ULONG pid)
+{
+	NTSTATUS status;
+	PKAPC_STATE ApcState;
+	status = PsLookupProcessByProcessId((HANDLE)pid, &crsEProc);
+	if(NT_SUCCESS(status))
+	{
+		ApcState = (PKAPC_STATE)ExAllocatePool(NonPagedPool, sizeof(KAPC_STATE));
+		KeStackAttachProcess(crsEProc, ApcState);
+	}
+	else
+		return;
+
+	if(is_xp)
+		hook_ssdt_entries();
+	else
+		hook_ssdt_entries_7();
+
+	KeUnstackDetachProcess(ApcState);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
 //		Uninstalls SSDT hooks (XP version)
 //	Parameters :
 //		None
@@ -52,6 +83,9 @@ VOID unhook_ssdt_entries()
 
 	if(oldZwCreateThread != NULL)
 		(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX) = oldZwCreateThread;
+		
+	if(oldZwCreateThreadEx != NULL)
+		(ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_INDEX) = oldZwCreateThreadEx;
 	
 	if(oldZwMapViewOfSection != NULL)
 		(ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_INDEX) = oldZwMapViewOfSection;
@@ -133,7 +167,127 @@ VOID unhook_ssdt_entries()
 		
 	if(oldZwUserCallOneParam != NULL)
 		(ZWUSERCALLONEPARAM)SHADOWSERVICE(USERCALLONEPARAM_INDEX) = oldZwUserCallOneParam;
+
+	if(oldZwLoadDriver != NULL)
+		(ZWLOADDRIVER)SYSTEMSERVICE(LOADDRIVER_INDEX) = oldZwLoadDriver;	
+		
+	enable_cr0();
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Uninstalls SSDT hooks (7 version)
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//	Process :
+//		Unset WP bit from CR0 register to be able to modify SSDT entries, restores the original values,
+//		and sets WP bit again.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+VOID unhook_ssdt_entries_7()
+{
+	disable_cr0();
+
+	if(oldZwCreateThread != NULL)
+		(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX) = oldZwCreateThread;
+		
+	if(oldZwCreateThreadEx != NULL)
+		(ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_7_INDEX) = oldZwCreateThreadEx;
 	
+	if(oldZwMapViewOfSection != NULL)
+		(ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_7_INDEX) = oldZwMapViewOfSection;
+	
+	if(oldZwSetContextThread != NULL)
+		(ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_7_INDEX) = oldZwSetContextThread;
+	
+	if(oldZwCreateProcess != NULL)
+		(ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_7_INDEX) = oldZwCreateProcess;
+	
+	if(oldZwCreateProcessEx != NULL)
+		(ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_7_INDEX) = oldZwCreateProcessEx;
+	
+	if(oldZwCreateUserProcess != NULL)
+		(ZWCREATEUSERPROCESS)SYSTEMSERVICE(CREATEUSERPROCESS_7_INDEX) = oldZwCreateUserProcess;
+		
+	if(oldZwQueueApcThread != NULL)
+		(ZWQUEUEAPCTHREAD)SYSTEMSERVICE(QUEUEAPCTHREAD_7_INDEX) = oldZwQueueApcThread;
+	
+	if(oldZwSystemDebugControl != NULL)
+		(ZWSYSTEMDEBUGCONTROL)SYSTEMSERVICE(SYSTEMDEBUGCONTROL_7_INDEX) = oldZwSystemDebugControl;
+	
+	if(oldZwWriteVirtualMemory != NULL)
+		(ZWWRITEVIRTUALMEMORY)SYSTEMSERVICE(WRITEVIRTUALMEMORY_7_INDEX) = oldZwWriteVirtualMemory;
+	
+	if(oldZwDebugActiveProcess != NULL)
+		(ZWDEBUGACTIVEPROCESS)SYSTEMSERVICE(DEBUGACTIVEPROCESS_7_INDEX) = oldZwDebugActiveProcess;
+	
+	if(oldZwOpenProcess != NULL)
+		(ZWOPENPROCESS)SYSTEMSERVICE(OPENPROCESS_7_INDEX) = oldZwOpenProcess;
+	
+	if(oldZwOpenThread != NULL)
+		(ZWOPENTHREAD)SYSTEMSERVICE(OPENTHREAD_7_INDEX) = oldZwOpenThread;
+	
+	if(oldZwQuerySystemInformation != NULL)
+		(ZWQUERYSYSTEMINFORMATION)SYSTEMSERVICE(QUERYSYSTEMINFORMATION_7_INDEX) = oldZwQuerySystemInformation;
+	
+	if(oldZwCreateFile != NULL)
+		(ZWCREATEFILE)SYSTEMSERVICE(CREATEFILE_7_INDEX) = oldZwCreateFile;
+	
+	if(oldZwReadFile != NULL)
+		(ZWREADFILE)SYSTEMSERVICE(READFILE_7_INDEX) = oldZwReadFile;
+	
+	if(oldZwWriteFile != NULL)
+		(ZWWRITEFILE)SYSTEMSERVICE(WRITEFILE_7_INDEX) = oldZwWriteFile;
+	
+	if(oldZwDeleteFile != NULL)
+		(ZWDELETEFILE)SYSTEMSERVICE(DELETEFILE_7_INDEX) = oldZwDeleteFile;
+	
+	if(oldZwSetInformationFile != NULL)
+		(ZWSETINFORMATIONFILE)SYSTEMSERVICE(SETINFORMATIONFILE_7_INDEX) = oldZwSetInformationFile;
+	
+	if(oldZwQueryInformationFile != NULL)
+		(ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_7_INDEX) = oldZwQueryInformationFile;
+	
+	if(oldZwCreateMutant != NULL)
+		(ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_7_INDEX) = oldZwCreateMutant;
+		
+	if(oldZwDeviceIoControlFile != NULL)
+		(ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_7_INDEX) = oldZwDeviceIoControlFile;
+		
+	if(oldZwTerminateProcess != NULL)
+		(ZWTERMINATEPROCESS)SYSTEMSERVICE(TERMINATEPROCESS_7_INDEX) = oldZwTerminateProcess;
+		
+	if(oldZwDelayExecution != NULL)
+		(ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_7_INDEX) = oldZwDelayExecution;
+		
+	if(oldZwQueryValueKey != NULL)
+		(ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_7_INDEX) = oldZwQueryValueKey;
+		
+	if(oldZwQueryAttributesFile != NULL)
+		(ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_7_INDEX) = oldZwQueryAttributesFile;
+		
+	if(oldZwReadVirtualMemory != NULL)
+		(ZWREADVIRTUALMEMORY)SYSTEMSERVICE(QUERYATTRIBUTESFILE_7_INDEX) = oldZwReadVirtualMemory;
+		
+	if(oldZwResumeThread != NULL)
+		(ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_7_INDEX) = oldZwResumeThread;
+	
+	if(oldZwCreateSection != NULL)
+		(ZWCREATESECTION)SYSTEMSERVICE(CREATESECTION_7_INDEX) = oldZwCreateSection;
+	
+	if(oldZwCreateProcess != NULL)
+		(ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_7_INDEX) = oldZwCreateProcess;
+	
+	if(oldZwCreateProcessEx != NULL)
+		(ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_7_INDEX) = oldZwCreateProcessEx;
+		
+	if(oldZwUserCallNoParam != NULL)
+		(ZWUSERCALLNOPARAM)SHADOWSERVICE(USERCALLNOPARAM_7_INDEX) = oldZwUserCallNoParam;
+	
+	if(oldZwLoadDriver != NULL)
+		(ZWLOADDRIVER)SYSTEMSERVICE(LOADDRIVER_7_INDEX) = oldZwLoadDriver;	
+		
 	enable_cr0();
 }
 
@@ -149,11 +303,14 @@ VOID unhook_ssdt_entries()
 //		saving the original ones, and set the WP bit again.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID hook_ssdt_entries()
-{	
+{
 	disable_cr0();
 	
 	oldZwCreateThread = (ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX);
 	(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX) = newZwCreateThread;
+	
+	oldZwCreateThreadEx = (ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_INDEX);
+	(ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_INDEX) = newZwCreateThreadEx;
 	
 	oldZwSetContextThread = (ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_INDEX);
 	(ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_INDEX) = newZwSetContextThread;
@@ -235,95 +392,128 @@ VOID hook_ssdt_entries()
 	
 	oldZwUserCallOneParam = (ZWUSERCALLONEPARAM)SHADOWSERVICE(USERCALLONEPARAM_INDEX);
 	(ZWUSERCALLONEPARAM)SHADOWSERVICE(USERCALLONEPARAM_INDEX) = newZwUserCallOneParam;
-		
+	
+	oldZwLoadDriver = (ZWLOADDRIVER)SYSTEMSERVICE(LOADDRIVER_INDEX);
+	(ZWLOADDRIVER)SYSTEMSERVICE(LOADDRIVER_INDEX) = newZwLoadDriver;
+	
 	enable_cr0();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Retrieve info table
+//		Installs SSDT hooks (7 version)
 //	Parameters :
 //		None
 //	Return value :
 //		None
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-PVOID getInfoTable(ULONG ATableType)   
-{   
-  ULONG mSize = 0x4000;   
-  PVOID mPtr = NULL;   
-  NTSTATUS St;   
-  
-  do   
-  {   
-     mPtr = ExAllocatePoolWithTag(PagedPool, mSize, BUF_POOL_TAG);   
-     memset(mPtr, 0, mSize);   
-     if (mPtr)     
-        St = ZwQuerySystemInformation(ATableType, mPtr, mSize, NULL);   
-	 else 
-		return NULL;   
-     if (St == STATUS_INFO_LENGTH_MISMATCH)   
-     {   
-        ExFreePool(mPtr);   
-        mSize = mSize * 2;   
-     }   
-  } while (St == STATUS_INFO_LENGTH_MISMATCH);   
+//	Process :
+//		Unset WP bit from CR0 register to be able to modify SSDT entries, patch with our values after,
+//		saving the original ones, and set the WP bit again.
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+VOID hook_ssdt_entries_7()
+{
+	disable_cr0();
+	
+	oldZwCreateThread = (ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX);
+	(ZWCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX) = newZwCreateThread;
+	
+	oldZwCreateThreadEx = (ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_7_INDEX);
+	(ZWCREATETHREADEX)SYSTEMSERVICE(CREATETHREADEX_7_INDEX) = newZwCreateThreadEx;
+	
+	oldZwSetContextThread = (ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_7_INDEX);
+	(ZWSETCONTEXTTHREAD)SYSTEMSERVICE(SETCONTEXTTHREAD_7_INDEX) = newZwSetContextThread;
+	
+	oldZwCreateProcess = (ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_7_INDEX);
+	(ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_7_INDEX) = newZwCreateProcess;
+	
+	oldZwCreateProcessEx = (ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_7_INDEX);
+	(ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_7_INDEX) = newZwCreateProcessEx;
+	
+	oldZwCreateUserProcess = (ZWCREATEUSERPROCESS)SYSTEMSERVICE(CREATEUSERPROCESS_7_INDEX);
+	(ZWCREATEUSERPROCESS)SYSTEMSERVICE(CREATEUSERPROCESS_7_INDEX) = newZwCreateUserProcess;
+	
+	oldZwQueueApcThread = (ZWQUEUEAPCTHREAD)SYSTEMSERVICE(QUEUEAPCTHREAD_7_INDEX);
+	(ZWQUEUEAPCTHREAD)SYSTEMSERVICE(QUEUEAPCTHREAD_7_INDEX) = newZwQueueApcThread;
+	
+	oldZwWriteVirtualMemory = (ZWWRITEVIRTUALMEMORY)SYSTEMSERVICE(WRITEVIRTUALMEMORY_7_INDEX);
+	(ZWWRITEVIRTUALMEMORY)SYSTEMSERVICE(WRITEVIRTUALMEMORY_7_INDEX) = newZwWriteVirtualMemory;
+	
+	oldZwSystemDebugControl = (ZWSYSTEMDEBUGCONTROL)SYSTEMSERVICE(SYSTEMDEBUGCONTROL_7_INDEX);
+	(ZWSYSTEMDEBUGCONTROL)SYSTEMSERVICE(SYSTEMDEBUGCONTROL_7_INDEX) = newZwSystemDebugControl;
+	
+	oldZwMapViewOfSection = (ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_7_INDEX);
+	(ZWMAPVIEWOFSECTION)SYSTEMSERVICE(MAPVIEWOFSECTION_7_INDEX) = newZwMapViewOfSection;
+	
+	oldZwDebugActiveProcess = (ZWDEBUGACTIVEPROCESS)SYSTEMSERVICE(DEBUGACTIVEPROCESS_7_INDEX);
+	(ZWDEBUGACTIVEPROCESS)SYSTEMSERVICE(DEBUGACTIVEPROCESS_7_INDEX) = newZwDebugActiveProcess;
+	
+	oldZwOpenProcess = (ZWOPENPROCESS)SYSTEMSERVICE(OPENPROCESS_7_INDEX);
+	(ZWOPENPROCESS)SYSTEMSERVICE(OPENPROCESS_7_INDEX) = newZwOpenProcess;
+	
+	oldZwCreateProcess = (ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_7_INDEX);
+	(ZWCREATEPROCESS)SYSTEMSERVICE(CREATEPROCESS_7_INDEX) = newZwCreateProcess;
+	
+	oldZwCreateProcessEx = (ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_7_INDEX);
+	(ZWCREATEPROCESSEX)SYSTEMSERVICE(CREATEPROCESSEX_7_INDEX) = newZwCreateProcessEx;
+	
+	oldZwOpenThread = (ZWOPENTHREAD)SYSTEMSERVICE(OPENTHREAD_7_INDEX);
+	(ZWOPENTHREAD)SYSTEMSERVICE(OPENTHREAD_7_INDEX) = newZwOpenThread;
+	
+	oldZwQuerySystemInformation = (ZWQUERYSYSTEMINFORMATION)SYSTEMSERVICE(QUERYSYSTEMINFORMATION_7_INDEX);
+	(ZWQUERYSYSTEMINFORMATION)SYSTEMSERVICE(QUERYSYSTEMINFORMATION_7_INDEX) = newZwQuerySystemInformation;
+	
+	oldZwCreateFile = (ZWCREATEFILE)SYSTEMSERVICE(CREATEFILE_7_INDEX);
+	(ZWCREATEFILE)SYSTEMSERVICE(CREATEFILE_7_INDEX) = newZwCreateFile;
+	
+	oldZwReadFile = (ZWREADFILE)SYSTEMSERVICE(READFILE_7_INDEX);
+	(ZWREADFILE)SYSTEMSERVICE(READFILE_7_INDEX) = newZwReadFile;
+	
+	oldZwWriteFile = (ZWWRITEFILE)SYSTEMSERVICE(WRITEFILE_7_INDEX);
+	(ZWWRITEFILE)SYSTEMSERVICE(WRITEFILE_7_INDEX) = newZwWriteFile;
+	
+	oldZwDeleteFile = (ZWDELETEFILE)SYSTEMSERVICE(DELETEFILE_7_INDEX);
+	(ZWDELETEFILE)SYSTEMSERVICE(DELETEFILE_7_INDEX) = newZwDeleteFile;
+	
+	oldZwSetInformationFile = (ZWSETINFORMATIONFILE)SYSTEMSERVICE(SETINFORMATIONFILE_7_INDEX);
+	(ZWSETINFORMATIONFILE)SYSTEMSERVICE(SETINFORMATIONFILE_7_INDEX) = newZwSetInformationFile;
+	
+	oldZwQueryInformationFile = (ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_7_INDEX);
+	(ZWQUERYINFORMATIONFILE)SYSTEMSERVICE(QUERYINFORMATIONFILE_7_INDEX) = newZwQueryInformationFile;
 
-  if(NT_SUCCESS(St)) 
-	return mPtr;   
-  
-  ExFreePool(mPtr);   
-  return NULL;   
-}   
+	oldZwCreateMutant = (ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_7_INDEX);
+	(ZWCREATEMUTANT)SYSTEMSERVICE(CREATEMUTANT_7_INDEX) = newZwCreateMutant;
+	
+	oldZwDeviceIoControlFile = (ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_7_INDEX);
+	(ZWDEVICEIOCONTROLFILE)SYSTEMSERVICE(DEVICEIOCONTROLFILE_7_INDEX) = newZwDeviceIoControlFile;
+	
+	oldZwTerminateProcess = (ZWTERMINATEPROCESS)SYSTEMSERVICE(TERMINATEPROCESS_7_INDEX);
+	(ZWTERMINATEPROCESS)SYSTEMSERVICE(TERMINATEPROCESS_7_INDEX) = newZwTerminateProcess;
+	
+	oldZwDelayExecution = (ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_7_INDEX);
+	(ZWDELAYEXECUTION)SYSTEMSERVICE(DELAYEXECUTION_7_INDEX) = newZwDelayExecution;
+	
+	oldZwQueryValueKey = (ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_7_INDEX);
+	(ZWQUERYVALUEKEY)SYSTEMSERVICE(QUERYVALUEKEY_7_INDEX) = newZwQueryValueKey;
+	
+	oldZwQueryAttributesFile = (ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_7_INDEX);
+	(ZWQUERYATTRIBUTESFILE)SYSTEMSERVICE(QUERYATTRIBUTESFILE_7_INDEX) = newZwQueryAttributesFile;
+	
+	oldZwReadVirtualMemory = (ZWREADVIRTUALMEMORY)SYSTEMSERVICE(READVIRTUALMEMORY_7_INDEX);
+	(ZWREADVIRTUALMEMORY)SYSTEMSERVICE(READVIRTUALMEMORY_7_INDEX) = newZwReadVirtualMemory;
+	
+	oldZwResumeThread = (ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_7_INDEX);
+	(ZWRESUMETHREAD)SYSTEMSERVICE(RESUMETHREAD_7_INDEX) = newZwResumeThread;
+	
+	oldZwCreateSection = (ZWCREATESECTION)SYSTEMSERVICE(CREATESECTION_7_INDEX);
+	(ZWCREATESECTION)SYSTEMSERVICE(CREATESECTION_7_INDEX) = newZwCreateSection;
+	
+	oldZwUserCallNoParam = (ZWUSERCALLNOPARAM)SHADOWSERVICE(USERCALLNOPARAM_7_INDEX);
+	(ZWUSERCALLNOPARAM)SHADOWSERVICE(USERCALLNOPARAM_7_INDEX) = newZwUserCallNoParam;
+	
+	oldZwLoadDriver = (ZWLOADDRIVER)SYSTEMSERVICE(LOADDRIVER_7_INDEX);
+	(ZWLOADDRIVER)SYSTEMSERVICE(LOADDRIVER_7_INDEX) = newZwLoadDriver;
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		get csrss.exe pid in order to retrieve and modify shadow table entries
-//	Parameters :
-//		None
-//	Return value :
-//		None
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-HANDLE getCsrPid()   
-{   
-    HANDLE Process, hObject;   
-    HANDLE CsrId = (HANDLE)0;   
-    OBJECT_ATTRIBUTES obj;   
-    CLIENT_ID cid;   
-    UCHAR Buff[0x100];   
-    POBJECT_NAME_INFORMATION ObjName = (PVOID)&Buff;   
-    PSYSTEM_HANDLE_INFORMATION_EX Handles = NULL;   
-    ULONG r;   
-   
-    Handles = getInfoTable(SystemHandleInformation);   
-    if (!Handles)
-		return CsrId;   
-   
-    for (r = 0; r < Handles->NumberOfHandles; r++)   
-    {   
-        if (Handles->Information[r].ObjectTypeNumber == 21) //Port object   
-        {   
-            InitializeObjectAttributes(&obj, NULL, OBJ_KERNEL_HANDLE, NULL, NULL);   
-   
-            cid.UniqueProcess = (HANDLE)Handles->Information[r].ProcessId;   
-            cid.UniqueThread = 0;   
-   
-            if (NT_SUCCESS(NtOpenProcess(&Process, PROCESS_DUP_HANDLE, &obj, &cid)))   
-            {   
-                if (NT_SUCCESS(ZwDuplicateObject(Process, (HANDLE)Handles->Information[r].Handle,NtCurrentProcess(), &hObject, 0, 0, DUPLICATE_SAME_ACCESS)))   
-                {   
-                    if (NT_SUCCESS(ZwQueryObject(hObject, ObjectNameInformation, ObjName, 0x100, NULL)))   
-                    {   
-                        if (ObjName->Name.Buffer && !wcsncmp(L"\\Windows\\ApiPort", ObjName->Name.Buffer, 20))             
-                          CsrId = (HANDLE)Handles->Information[r].ProcessId;   
-                    }   
-                    ZwClose(hObject);   
-                }   
-                ZwClose(Process);   
-            }   
-        }   
-    }   
-    ExFreePool(Handles);   
-    return CsrId;   
+	enable_cr0();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -370,7 +560,6 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 	ULONG currentProcessId, targetThreadId, targetProcessId;
 	USHORT log_lvl = LOG_ERROR;
 	PWCHAR parameter = NULL;
-	PETHREAD eThread = NULL;
 	
 	ULONG kUniqueThread;
 	HANDLE kThreadHandle;
@@ -409,10 +598,7 @@ NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 			}
 		
 			targetThreadId = getTIDByHandle(kThreadHandle);
-			if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)targetThreadId, &eThread)))
-				targetProcessId = *(DWORD*)((PCHAR)eThread+0x1EC);
-			else
-				targetProcessId = 0;
+			targetProcessId = getPIDByThreadHandle(kThreadHandle);
 			
 			if(isProcessHiddenByPid(targetProcessId))
 			{
@@ -915,7 +1101,6 @@ NTSTATUS newZwWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID 
 	return statusCall;
 }
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
 //		Logs process debugging (may be used for code injection).
@@ -1209,10 +1394,8 @@ NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 NTSTATUS newZwQueueApcThread(HANDLE ThreadHandle, PIO_APC_ROUTINE ApcRoutine, PVOID ApcRoutineContext, PIO_STATUS_BLOCK ApcStatusBlock, ULONG ApcReserved)
 {
 	NTSTATUS statusCall;
-	ULONG currentProcessId, targetThreadId;
-	DWORD targetProcessId;
+	ULONG currentProcessId, targetThreadId, targetProcessId;
 	USHORT log_lvl = LOG_ERROR;
-	PETHREAD eThread = NULL;
 	PWCHAR parameter = NULL;
 	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
@@ -1225,12 +1408,8 @@ NTSTATUS newZwQueueApcThread(HANDLE ThreadHandle, PIO_APC_ROUTINE ApcRoutine, PV
 		#endif
 		
 		targetThreadId = getTIDByHandle(ThreadHandle);
+		targetProcessId = getPIDByThreadHandle(ThreadHandle);
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
-		
-		if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)targetThreadId, &eThread)))
-			targetProcessId = *(DWORD*)((PCHAR)eThread+0x1EC);
-		else
-			targetProcessId = 0;
 			
 		if(NT_SUCCESS(statusCall))
 		{
@@ -1363,6 +1542,93 @@ NTSTATUS newZwCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJ
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
+//		Logs thread creation.
+//	Parameters :
+//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
+//	Return value :
+//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
+//	Process :
+//		Gets the thread's owner, proceeds the call then adds immediately the targetProcessId to the monitored
+//		processes list if it succeeded. Then logs.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwCreateThreadEx(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PVOID StartAddress, PVOID Parameter, BOOLEAN CreateSuspended, ULONG StackZeroBits, ULONG SizeOfStackCommit, ULONG SizeOfStackReserve, PVOID BytesBuffer)
+{
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, targetProcessId, createdThreadId;
+	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
+	
+	HANDLE kThreadHandle;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	
+	targetProcessId = getPIDByHandle(ProcessHandle);	// faster than placing it after the monitored process check
+	statusCall = ((ZWCREATETHREADEX)(oldZwCreateThreadEx))(ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, StartAddress, Parameter, CreateSuspended, StackZeroBits, SizeOfStackCommit, SizeOfStackReserve, BytesBuffer);
+	
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		#ifdef DEBUG
+		DbgPrint("call ZwCreateThreadEx\n");
+		#endif
+		
+		if(NT_SUCCESS(statusCall) && targetProcessId)
+			startMonitoringProcess(targetProcessId);	// <-- RACE CONDITION
+		
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		_try
+		{
+			if(ExGetPreviousMode() != KernelMode)
+				ProbeForRead(ThreadHandle, sizeof(HANDLE), 1);
+			kThreadHandle = *ThreadHandle;
+		} 
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR", exceptionCode)))
+				sendLogs(currentProcessId, L"ZwCreateThreadEx", parameter);
+			else 
+				sendLogs(currentProcessId, L"ZwCreateThreadEx", L"0,-1,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
+			if(parameter)
+				ExFreePool(parameter);
+			return statusCall;
+		}
+		
+		createdThreadId = getTIDByHandle(kThreadHandle);
+		
+		if(NT_SUCCESS(statusCall))
+		{
+			log_lvl = LOG_SUCCESS;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssss,PID->%d,ThreadHandle->0x%08x,TID->%d,CreateSuspended->%d,DesiredAccess->0x%08x", targetProcessId, kThreadHandle, createdThreadId, CreateSuspended, DesiredAccess)))
+				log_lvl = LOG_PARAM;
+		}
+		else
+		{
+			log_lvl = LOG_ERROR;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,PID->%d,ThreadHandle->0x%08x,TID->%d,CreateSuspended->%d,DesiredAccess->0x%08x", statusCall, targetProcessId, kThreadHandle, createdThreadId, CreateSuspended, DesiredAccess)))
+				log_lvl = LOG_PARAM;
+		}
+		
+		switch(log_lvl)
+		{
+			case LOG_PARAM:
+				sendLogs(currentProcessId, L"ZwCreateThreadEx", parameter);
+			break;
+			case LOG_SUCCESS:
+				sendLogs(currentProcessId, L"ZwCreateThreadEx", L"0,-1,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
+			break;
+			default:
+				sendLogs(currentProcessId, L"ZwCreateThreadEx", L"1,0,sssss,PID->ERROR,ThreadHandle->ERROR,TID->ERROR,CreateSuspended->ERROR,DesiredAccess->ERROR");
+			break;
+		}
+		if(parameter != NULL)
+			ExFreePool(parameter);
+	}
+	return statusCall;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
 //		Logs section mapping (may be used for code injection).
 //	Parameters :
 //		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566481(v=vs.85).aspx
@@ -1445,11 +1711,9 @@ NTSTATUS newZwMapViewOfSection(HANDLE SectionHandle, HANDLE ProcessHandle, PVOID
 NTSTATUS newZwSetContextThread(HANDLE ThreadHandle, PCONTEXT Context)
 {
 	NTSTATUS statusCall;
-	ULONG currentProcessId, targetThreadId;
-	DWORD targetProcessId;
+	ULONG currentProcessId, targetThreadId, targetProcessId;
 	USHORT log_lvl = LOG_ERROR;
 	PWCHAR parameter = NULL;
-	PETHREAD eThread = NULL;
 	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
 	statusCall = ((ZWSETCONTEXTTHREAD)(oldZwSetContextThread))(ThreadHandle, Context);
@@ -1462,13 +1726,8 @@ NTSTATUS newZwSetContextThread(HANDLE ThreadHandle, PCONTEXT Context)
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
 		targetThreadId = getTIDByHandle(ThreadHandle);
-		
-		if(NT_SUCCESS(PsLookupThreadByThreadId((HANDLE)targetThreadId, &eThread)))
-			targetProcessId = *(DWORD*)((PCHAR)eThread+0x1EC);
-		else
-			targetProcessId = -1;
-			
-			
+		targetProcessId = getPIDByThreadHandle(ThreadHandle);
+	
 		if(NT_SUCCESS(statusCall))
 		{
 			log_lvl = LOG_SUCCESS;
@@ -1819,7 +2078,6 @@ NTSTATUS newZwWriteFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRout
 	}
 	return statusCall;
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -2526,6 +2784,51 @@ NTSTATUS newZwResumeThread(HANDLE ThreadHandle, PULONG SuspendCount)
 	}
 	return statusCall;
 }
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Block driver loading.
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566470%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566470%28v=vs.85%29.aspx
+//	Process : Avoid any driver to load during malware execution
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwLoadDriver(PUNICODE_STRING DriverServiceName)
+{	
+	NTSTATUS exceptionCode;
+	UNICODE_STRING kDriverServiceName;
+	PWCHAR parameter = NULL;
+	ULONG currentProcessId;
+	
+	#ifdef DEBUG
+	DbgPrint("call ZwLoadDriver\n");
+	#endif	
+
+	parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	
+	__try 
+	{
+		if(ExGetPreviousMode() != KernelMode)
+			ProbeForRead(DriverServiceName, sizeof(UNICODE_STRING), 1);
+		kDriverServiceName = *DriverServiceName;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		exceptionCode = GetExceptionCode();
+		if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,DriverName->ERROR",exceptionCode)))
+			sendLogs(currentProcessId, L"ZwLoadDriver", parameter);
+		ExFreePool(parameter);
+		return STATUS_UNSUCCESSFUL;
+	}
+	
+	if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,s,DriverName->%wZ", STATUS_UNSUCCESSFUL, &kDriverServiceName)))
+		sendLogs(currentProcessId, L"ZwLoadDriver", parameter);
+	else
+		sendLogs(currentProcessId, L"ZwLoadDriver", L"0,-1,s,DriverName->ERROR");
+	
+	return STATUS_UNSUCCESSFUL;
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  Description :
@@ -2583,7 +2886,86 @@ NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval)
 	return ((ZWDELAYEXECUTION)(oldZwDelayExecution))(Alertable, DelayInterval);
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process creation.
+//	Parameters :
+//		See http://www.rohitab.com/discuss/topic/40191-ntcreateuserprocess/ (lulz)
+//	Return value :
+//		See http://www.rohitab.com/discuss/topic/40191-ntcreateuserprocess/ (lulz)
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newZwCreateUserProcess(PHANDLE ProcessHandle, PHANDLE ThreadHandle, ACCESS_MASK ProcessDesiredAccess, ACCESS_MASK ThreadDesiredAccess, POBJECT_ATTRIBUTES ProcessObjectAttributes, POBJECT_ATTRIBUTES ThreadObjectAttributes, ULONG ProcessFlags, ULONG ThreadFlags, PRTL_USER_PROCESS_PARAMETERS ProcessParameters, PVOID CreateInfo, PVOID AttributeList)
+{
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, childProcessId;
+	USHORT log_lvl = LOG_ERROR;
+	PWCHAR parameter = NULL;
+	HANDLE kProcessHandle, kThreadHandle;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	statusCall = ((ZWCREATEUSERPROCESS)(oldZwCreateUserProcess))(ProcessHandle, ThreadHandle, ProcessDesiredAccess, ThreadDesiredAccess, ProcessObjectAttributes, ThreadObjectAttributes, ProcessFlags, ThreadFlags, ProcessParameters, CreateInfo, AttributeList);
 
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		#ifdef DEBUG
+		DbgPrint("call ZwCreateUserProcess\n");
+		#endif
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		
+		__try
+		{
+			if(ExGetPreviousMode() != KernelMode)
+			{
+				ProbeForRead(ProcessHandle, sizeof(HANDLE), 1);
+				ProbeForRead(ThreadHandle, sizeof(HANDLE), 1);
+			}
+			kProcessHandle = *ProcessHandle;
+			kThreadHandle = *ThreadHandle;
+			childProcessId = getPIDByHandle(kProcessHandle);
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssssss,ProcessHandle->ERROR,ThreadHandle->ERROR,PID->ERROR,ProcessDesiredAccess->ERROR,ThreadDesiredAccess->ERROR,ImagePathName->ERROR,CommandLine->ERROR", exceptionCode)))
+				sendLogs(currentProcessId, L"ZwCreateUserProcess", parameter);
+			else
+				sendLogs(currentProcessId, L"ZwCreateUserProcess", L"0,-1,sssssss,ProcessHandle->ERROR,ThreadHandle->ERROR,PID->ERROR,ProcessDesiredAccess->ERROR,ThreadDesiredAccess->ERROR,ImagePathName->ERROR,CommandLine->ERROR");
+			ExFreePool(parameter);
+			return statusCall;
+		}
+		
+		if(NT_SUCCESS(statusCall))
+		{
+			log_lvl = LOG_SUCCESS;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssssss,ProcessHandle->0x%08x,ThreadHandle->0x%08x,PID->%d,ProcessDesiredAccess->0x%08x,ThreadDesiredAccess->0x%08x,ImagePathName->%wZ,CommandLine->%wZ", kProcessHandle, kThreadHandle, childProcessId, ProcessDesiredAccess, ThreadDesiredAccess, &ProcessParameters->ImagePathName, &ProcessParameters->CommandLine)))
+				log_lvl = LOG_PARAM;
+			if(childProcessId)
+				startMonitoringProcess(childProcessId);
+		}
+		else
+		{
+			log_lvl = LOG_ERROR;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssssss,ProcessHandle->0x%08x,ThreadHandle->0x%08x,PID->%d,ProcessDesiredAccess->0x%08x,ThreadDesiredAccess->0x%08x,ImagePathName->%wZ,CommandLine->%wZ", statusCall, kProcessHandle, kThreadHandle, childProcessId, ProcessDesiredAccess, ThreadDesiredAccess, &ProcessParameters->ImagePathName, &ProcessParameters->CommandLine)))
+				log_lvl = LOG_PARAM;
+		}
+		
+		switch(log_lvl)
+		{
+			case LOG_PARAM:
+				sendLogs(currentProcessId, L"ZwCreateUserProcess", parameter);
+			break;
+			case LOG_SUCCESS:
+				sendLogs(currentProcessId, L"ZwCreateUserProcess", L"0,-1,sssssss,ProcessHandle->ERROR,ThreadHandle->ERROR,PID->ERROR,ProcessDesiredAccess->ERROR,ThreadDesiredAccess->ERROR,ImagePathName->ERROR,CommandLine->ERROR");
+			break;
+			default:
+				sendLogs(currentProcessId, L"ZwCreateUserProcess", L"1,0,sssssss,ProcessHandle->ERROR,ThreadHandle->ERROR,PID->ERROR,ProcessDesiredAccess->ERROR,ThreadDesiredAccess->ERROR,ImagePathName->ERROR,CommandLine->ERROR");
+			break;
+		}
+		if(parameter != NULL)
+			ExFreePool(parameter);
+	}	
+	return statusCall;
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //  Description :
@@ -2797,7 +3179,7 @@ NTSTATUS newZwQueryAttributesFile(POBJECT_ATTRIBUTES ObjectAttributes, PFILE_BAS
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Blocks shutdown attempts through ExWindowsEx
+//		Blocks shutdown attempts through ExWindowsEx (on WinXP)
 //	Parameters :
 //		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallOneParam
 //	Return value :
@@ -2828,6 +3210,45 @@ ULONG newZwUserCallOneParam(ULONG Param, ULONG Routine)
 		}
 	}
 	return ((ZWUSERCALLONEPARAM)(oldZwUserCallOneParam))(Param, Routine);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Blocks shutdown attempts through ExWindowsEx (on Win7)
+//	Parameters :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallNoParam
+//	Return value :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallNoParam
+// 	Process :
+//		if Routine == 0x10 // PrepareForLogoff , block and log the call
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ULONG newZwUserCallNoParam(ULONG Routine)
+{
+	ULONG currentProcessId;
+	PWCHAR parameter = NULL;
+		
+	currentProcessId = (ULONG)PsGetCurrentProcessId();
+	
+	if(isProcessMonitoredByPid(currentProcessId))
+	{
+		#ifdef DEBUG
+		DbgPrint("call ZwUserCallNoParam() !\n");
+		#endif
+		
+		if(Routine == 0x10)
+		{
+			parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,s,Routine->16")))
+				sendLogs(currentProcessId, L"ZwUserCallNoParam", parameter);
+			else
+				sendLogs(currentProcessId, L"ZwUserCallNoParam", L"1,0,s,Routine->16");				
+			if(parameter)
+				ExFreePool(parameter);
+			cleanMonitoredProcessList();	
+			return 0;	
+		}
+	}
+	return ((ZWUSERCALLNOPARAM)(oldZwUserCallNoParam))(Routine);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////

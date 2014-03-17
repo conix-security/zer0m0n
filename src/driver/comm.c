@@ -33,6 +33,7 @@
 #include "main.h"
 #include "utils.h"
 #include "monitor.h"
+#include "hook.h"
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -82,7 +83,7 @@ VOID DisconnectCallback(PVOID ConnectionCookie)
 //		- Retrieves the process name from the pid and saves the whole data into an ANSI string.
 //		- Generates an ANSI string with the message, with the process name, pid, and function name, and the
 //		- generic "parameter" parameter. The resulting output will basically follow this scheme:
-//			"pid","process_name","function_name","FAILED/SUCCESS(0/1)","return_value","number_of_arguments","argument1->value","argument2->value"...
+//			"pid","proces_name","function_name","FAILED/SUCCESS(0/1)","return_value","number_of_arguments","argument1->value","argument2->value"...
 //		- Uses the "mutex" mutex to avoid concurrency when using the FltSendMessage() function.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
@@ -193,7 +194,7 @@ NTSTATUS parse_pids(PCHAR pids)
 {
 	PCHAR start = NULL, current = NULL, data = NULL;
 	ULONG len, pid;
-	BOOLEAN first_pid = TRUE;
+	int nb_pid = 0;
 	NTSTATUS status;
 	
 	if(pids == NULL)
@@ -225,16 +226,22 @@ NTSTATUS parse_pids(PCHAR pids)
 			status = RtlCharToInteger(start, 10, &pid);
 			if(NT_SUCCESS(status) && pid!=0)
 			{
-				if(first_pid)
+				if(!nb_pid)
 				{
 					startMonitoringProcess(pid);
-					first_pid=FALSE;
+				}
+				else if(nb_pid == 1)
+				{
+					if(pid)
+						addHiddenProcess(pid);
+					hook_ssdt(pid);
 				}
 				else
 				{
 					if(pid)
 						addHiddenProcess(pid);
 				}
+				nb_pid++;
 			}
 			start = current+1;
 		}
@@ -246,8 +253,14 @@ NTSTATUS parse_pids(PCHAR pids)
 		status = RtlCharToInteger(start, 10, &pid);
 		if(NT_SUCCESS(status) && pid!=0)
 		{
-			if(first_pid)
+			if(!nb_pid)
 				startMonitoringProcess(pid);
+			else if(nb_pid == 1)
+			{
+				if(pid)
+					addHiddenProcess(pid);
+				hook_ssdt(pid);	
+			}	
 			else
 				addHiddenProcess(pid);
 		}	

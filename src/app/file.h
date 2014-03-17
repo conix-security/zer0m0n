@@ -9,7 +9,7 @@ static IS_SUCCESS_NTSTATUS();
     FILE_WRITE_DATA | FILE_APPEND_DATA | STANDARD_RIGHTS_WRITE | \
     STANDARD_RIGHTS_ALL)
 
-#define HDDVOL1 L"\\Device\\HarddiskVolume1"
+#define HDDVOL L"\\Device\\HarddiskVolume"
 
 // length of a hardcoded unicode string
 #define UNILEN(x) (sizeof(x) / sizeof(wchar_t) - 1)
@@ -29,4 +29,5 @@ static void cache_file(HANDLE file_handle, const wchar_t *path,
     unsigned int length, unsigned int attributes);
 void handle_new_file(HANDLE file_handle, OBJECT_ATTRIBUTES *obj);
 void file_close(HANDLE file_handle);
+wchar_t *wcsistr(wchar_t *wcs1, wchar_t *wcs2);
 
