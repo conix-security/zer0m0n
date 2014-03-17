@@ -14,7 +14,6 @@ To-do :
 
 v0.6 changes :
 
-
 v0.5 changes :
 + bug fixes
 + win7 support
