@@ -1,4 +1,4 @@
-zer0m0n v0.5 (DEVELOPMENT BRANCH)
+zer0m0n v0.6 (DEVELOPMENT BRANCH)
 =================================
 
 To-do :
@@ -11,6 +11,9 @@ To-do :
 + Handle SSDT hooks race conditions (perform legitimate calls with copied parameters)
 + fix random socket desynch
 + etc.
+
+v0.6 changes :
+
 
 v0.5 changes :
 + fix bugs
