@@ -55,7 +55,6 @@ FLT_REGISTRATION registration =
     NULL
 };
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description : initializes the driver and the filter port, registers driver and registry callbacks.
 //
@@ -112,37 +111,43 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	
 	monitored_process_list = NULL;
 	hidden_process_list = NULL;
+	monitored_handle_list = NULL;
 	
 	// initialize every function pointers to null
-	oldZwMapViewOfSection = NULL;
-	oldZwSetContextThread = NULL;
-	oldZwCreateThread = NULL;
-	oldZwQueueApcThread = NULL;
-	oldZwCreateProcess = NULL;
-	oldZwSystemDebugControl = NULL;
-	oldZwCreateProcessEx = NULL;
-	oldZwWriteVirtualMemory = NULL;
-	oldZwDebugActiveProcess = NULL;
-	oldZwOpenProcess = NULL;
-	oldZwOpenThread = NULL;
-	oldZwQuerySystemInformation = NULL;
-	oldZwCreateFile = NULL;
-	oldZwReadFile = NULL;
-	oldZwWriteFile = NULL;
-	oldZwDeleteFile = NULL;
-	oldZwSetInformationFile = NULL;
-	oldZwQueryInformationFile = NULL;
-	oldZwCreateMutant = NULL;
-	oldZwDeviceIoControlFile = NULL;
-	oldZwTerminateProcess = NULL;
-	oldZwDelayExecution = NULL;
-	oldZwQueryValueKey = NULL;
-	oldZwQueryAttributesFile = NULL;
-	oldZwReadVirtualMemory = NULL;
-	oldZwResumeThread = NULL;
-	oldZwCreateSection = NULL;
-	oldZwUserCallOneParam = NULL;
-	oldZwUserCallNoParam = NULL;
+	oldNtMapViewOfSection = NULL;
+	oldNtSetContextThread = NULL;
+	oldNtCreateThread = NULL;
+	oldNtQueueApcThread = NULL;
+	oldNtCreateProcess = NULL;
+	oldNtSystemDebugControl = NULL;
+	oldNtCreateProcessEx = NULL;
+	oldNtWriteVirtualMemory = NULL;
+	oldNtDebugActiveProcess = NULL;
+	oldNtOpenProcess = NULL;
+	oldNtOpenThread = NULL;
+	oldNtQuerySystemInformation = NULL;
+	oldNtCreateFile = NULL;
+	oldNtReadFile = NULL;
+	oldNtWriteFile = NULL;
+	oldNtDeleteFile = NULL;
+	oldNtSetInformationFile = NULL;
+	oldNtQueryInformationFile = NULL;
+	oldNtCreateMutant = NULL;
+	oldNtDeviceIoControlFile = NULL;
+	oldNtTerminateProcess = NULL;
+	oldNtDelayExecution = NULL;
+	oldNtQueryValueKey = NULL;
+	oldNtQueryAttributesFile = NULL;
+	oldNtReadVirtualMemory = NULL;
+	oldNtResumeThread = NULL;
+	oldNtCreateSection = NULL;
+	oldNtUserCallOneParam = NULL;
+	oldNtUserCallNoParam = NULL;
+	oldNtClose = NULL;
+	
+	#ifdef DEBUG
+	DbgPrint("IOCTL_CUCKOO_PATH : 0x%08x\n", IOCTL_CUCKOO_PATH);
+	#endif
 	
 	// get os version
 	if(!NT_SUCCESS(RtlGetVersion(&osInfo)))
@@ -234,6 +239,8 @@ VOID Unload(PDRIVER_OBJECT pDriverObject)
 	
 	cleanMonitoredProcessList();	
 	cleanHiddenProcessList();
+	
+	ExFreePool(cuckooPath);
 }
  
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -83,7 +83,7 @@ NTSTATUS regCallback (PVOID CallbackContext, PVOID Argument1, PVOID Argument2)
 					sendLogs(pid, L"REGISTRY_DELETE_KEY", L"1,0,s,SubKey->ERROR");
 			}
 			else
-				sendLogs(pid, L"REGISTRY_DELETE_KEY", L"1,0,s,SubKey->ERROR");
+				sendLogs(pid, L"REGISTRY_DELETE_KEY", L"0,-1,s,SubKey->ERROR");
 		break;
 		
 		case RegNtPreSetValueKey: 

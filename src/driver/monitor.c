@@ -59,9 +59,9 @@ NTSTATUS startMonitoringProcess(ULONG new_pid)
 	new_entry->pid = new_pid;
 	new_entry->flink = monitored_process_list;
 	monitored_process_list = new_entry;
-	//#ifdef DEBUG
+	#ifdef DEBUG
 	DbgPrint("New PID : %d\n",new_pid);
-	//#endif
+	#endif
 	return STATUS_SUCCESS;
 }
 
@@ -83,9 +83,9 @@ NTSTATUS addHiddenProcess(ULONG new_pid)
 	if(isProcessHiddenByPid(new_pid))
 		return STATUS_SUCCESS;
 
-	//#ifdef DEBUG
+	#ifdef DEBUG
 	DbgPrint("adding pid to hide : %d\n", new_pid);	
-	//#endif
+	#endif
 	
 	new_entry = (PHIDDEN_PROCESS)ExAllocatePoolWithTag(NonPagedPool,sizeof(HIDDEN_PROCESS),MONIT_POOL_TAG);
 	if(new_entry == NULL)
@@ -100,47 +100,79 @@ NTSTATUS addHiddenProcess(ULONG new_pid)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Removes "pid" from the monitored list (stops monitoring this process).
+//		Adds "handle" Handle in the hidden processes list.
 //	Parameters :
-//		_in_ ULONG pid : Process Identifier.
+//		_in_ HANDLE handle : File Handle.
+//	Return value :
+//		NTSTATUS : STATUS_SUCCESS if no error was encountered, otherwise, relevant NTSTATUS code.
+//	Process :
+//		Checks if the handle is not on the list. If not, add it to the linked list.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS addHandleInMonitoredList(HANDLE handle)
+{
+	PHANDLE_TO_MONITOR new_entry;
+	if(handle == 0)
+		return STATUS_INVALID_PARAMETER;
+	if(isHandleInMonitoredList(handle))
+		return STATUS_SUCCESS;
+
+	#ifdef DEBUG
+	DbgPrint("adding handle in monitored list : %d\n", handle);	
+	#endif
+	
+	new_entry = (PHANDLE_TO_MONITOR)ExAllocatePoolWithTag(NonPagedPool,sizeof(HANDLE_TO_MONITOR),MONIT_POOL_TAG);
+	if(new_entry == NULL)
+		return STATUS_NO_MEMORY;
+		
+	new_entry->handle = handle;
+	new_entry->flink = monitored_handle_list;
+	monitored_handle_list = new_entry;
+	
+	return STATUS_SUCCESS;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Removes "handle" from the monitored list (stops monitoring this handle).
+//	Parameters :
+//		_in_ HANDLE handle : File Handle.
 //	Return value :
 //		NTSTATUS :  STATUS_SUCCESS if no error was encountered, otherwise, relevant NTSTATUS code.
 //	Process :
-//		Checks if the PID is on the list. If yes, remove it.
+//		Checks if the handle is on the list. If yes, remove it.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS stopMonitoringProcess(ULONG existing_pid)
+NTSTATUS removeHandleInMonitoredList(HANDLE handle)
 {
-	PMONITORED_PROCESS_ENTRY currentMember, prevMember;
-	if(existing_pid == 0)
+	PHANDLE_TO_MONITOR currentMember, prevMember;
+	if(handle == 0)
 		return STATUS_INVALID_PARAMETER;
 		
 	prevMember = NULL;
-	currentMember = monitored_process_list;
+	currentMember = monitored_handle_list;
 	while(currentMember != NULL)
 	{
-		if(currentMember->pid == existing_pid)
+		if(currentMember->handle == handle)
 		{
 			if(prevMember == NULL)
 			{
-				monitored_process_list = (PMONITORED_PROCESS_ENTRY)(currentMember->flink);
-				ExFreePoolWithTag(prevMember,MONIT_POOL_TAG);
-				currentMember = monitored_process_list;
+				monitored_handle_list = (PHANDLE_TO_MONITOR)(currentMember->flink);
+				//ExFreePoolWithTag(prevMember,MONIT_POOL_TAG);
+				currentMember = monitored_handle_list;
 			}
 			else
 			{
 				prevMember->flink = currentMember->flink;
-				ExFreePoolWithTag(currentMember,MONIT_POOL_TAG);
-				currentMember = (PMONITORED_PROCESS_ENTRY)(prevMember->flink);
-				
+				//ExFreePoolWithTag(currentMember,MONIT_POOL_TAG);
+				currentMember = (PHANDLE_TO_MONITOR)(prevMember->flink);
 			}
 		}
 		else
 		{
 			prevMember = currentMember;
-			currentMember = (PMONITORED_PROCESS_ENTRY)(currentMember->flink);
+			currentMember = (PHANDLE_TO_MONITOR)(currentMember->flink);
 		}
 	}
-	
 	return STATUS_SUCCESS;
 }
 
@@ -239,7 +271,7 @@ BOOLEAN isProcessMonitoredByPid(ULONG pid)
 //	Return value :
 //		BOOLEAN : TRUE if found, FALSE if not.
 //	Process :
-//		Walks through the linked list, eturns TRUE if "pid" is found.
+//		Walks through the linked list, returns TRUE if "pid" is found.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 BOOLEAN isProcessHiddenByPid(ULONG pid)
 {
@@ -258,5 +290,33 @@ BOOLEAN isProcessHiddenByPid(ULONG pid)
 	}
 	
 	return FALSE;
+}
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Returns TRUE if handle is in the handle list to monitor.
+//	Parameters :
+//		_in_ HANDLE handle : File Handle.
+//	Return value :
+//		BOOLEAN : TRUE if found, FALSE if not.
+//	Process :
+//		Walks through the linked list, returns TRUE if "handle" is found.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+BOOLEAN isHandleInMonitoredList(HANDLE handle)
+{
+	PHANDLE_TO_MONITOR ptr;
+	
+	if(handle == 0)
+		return FALSE;
+		
+	ptr = monitored_handle_list;
+	while(ptr != NULL)
+	{
+		if(ptr->handle == handle)
+			return TRUE;
+		
+		ptr = (PHANDLE_TO_MONITOR)(ptr->flink);
+	}
+	
+	return FALSE;
 }

@@ -38,6 +38,9 @@
 #define IOCTL_PID \
 		CTL_CODE (FILE_DEVICE_UNKNOWN, 0x802, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
+#define IOCTL_CUCKOO_PATH \
+		CTL_CODE (FILE_DEVICE_UNKNOWN, 0x803, METHOD_BUFFERED, FILE_ANY_ACCESS)
+		
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
 //		Filter communication connection callback.

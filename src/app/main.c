@@ -331,11 +331,41 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 			free(us_pathfile);
 			free(pw_pathfile);
 		}
-		
+
+		// if the log contains "ZwSetInformationFile (Delete)" as function name, notifies cuckoo that a file has to be dumped
+		if(!strcmp(log.funcname, "ZwSetInformationFile (Delete)") && !log.ret)
+		{
+			us_pathfile = (PUNICODE_STRING)malloc(1024*sizeof(UNICODE_STRING));
+			pw_pathfile = (PWCHAR)malloc(1024*sizeof(WCHAR));
+			mbstowcs(pw_pathfile, log.arguments[3].value, strlen(log.arguments[3].value)+1);
+			RtlInitUnicodeString(us_pathfile, pw_pathfile);
+			new_file(us_pathfile);
+			free(us_pathfile);
+			free(pw_pathfile);
+		}
+
+		// if the log contains "ZwClose (FILE_DELETE_ON_CLOSE)" as function name, notifies cuckoo that a file has to be dumped
+		if(!strcmp(log.funcname, "ZwClose (FILE_DELETE_ON_CLOSE)") && !log.ret)
+		{
+			us_pathfile = (PUNICODE_STRING)malloc(1024*sizeof(UNICODE_STRING));
+			pw_pathfile = (PWCHAR)malloc(1024*sizeof(WCHAR));
+			mbstowcs(pw_pathfile, log.arguments[2].value, strlen(log.arguments[2].value)+1);
+			RtlInitUnicodeString(us_pathfile, pw_pathfile);
+			new_file(us_pathfile);
+			free(us_pathfile);
+			free(pw_pathfile);
+		}
+
 		// TODO
 		if(!strcmp(log.funcname, "ZwDeleteFile") && !log.ret)
 		{
-			//pipe("FILE_DEL:%s", log.arguments[0].value);
+			us_pathfile = (PUNICODE_STRING)malloc(1024*sizeof(UNICODE_STRING));
+			pw_pathfile = (PWCHAR)malloc(1024*sizeof(WCHAR));
+			mbstowcs(pw_pathfile, log.arguments[1].value, strlen(log.arguments[1].value)+1);
+			RtlInitUnicodeString(us_pathfile, pw_pathfile);
+			new_file(us_pathfile);
+			free(us_pathfile);
+			free(pw_pathfile);
 		}
 
 		// if a driver is loaded, notifies cuckoo to stop the analysis
