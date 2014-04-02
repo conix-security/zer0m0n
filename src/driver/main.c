@@ -231,6 +231,13 @@ VOID Unload(PDRIVER_OBJECT pDriverObject)
 	else
 		unhook_ssdt_entries_7();
 		
+	// Unlock and free MDL
+	if(g_pmdlSystemCall)
+	{
+		MmUnmapLockedPages(MappedSystemCallTable, g_pmdlSystemCall);
+		IoFreeMdl(g_pmdlSystemCall);
+	}
+	
 	CmUnRegisterCallback(cookie);
 	PsRemoveLoadImageNotifyRoutine(imageCallback);
 	

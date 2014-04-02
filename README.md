@@ -3,7 +3,6 @@ zer0m0n v0.6 (DEVELOPMENT BRANCH)
 
 To-do :
 + Eliminate bugs :]
-+ Cr0 reg trick => multiprocessor issues.
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
 + Add monitored functions/events
 + x64 support (get rid of SSDT hooks)
@@ -12,6 +11,7 @@ To-do :
 
 v0.6 changes :
 + handle files deletion (through NtDeleteFile, NtCreateFile/NtClose via FILE_DELETE_ON_CLOSE and NtSetInformationFile)
++ using MDL instead of cr0 trick => fix multiprocessor issues
 
 v0.5 changes :
 + bug fixes

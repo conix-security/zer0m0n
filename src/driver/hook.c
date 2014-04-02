@@ -35,6 +35,31 @@
 #include "monitor.h"
 #include "comm.h"
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Change MDL Permission in order to hook the SSDT
+//	Parameters :
+//		None
+//	Return value :
+//		None
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS changeMDLPermission()
+{
+	// Map the memory into our domain so we can change the permissions on the MDL.
+	g_pmdlSystemCall = MmCreateMdl(NULL,
+								KeServiceDescriptorTable.ServiceTableBase,
+								KeServiceDescriptorTable.NumberOfServices * 4);
+    if(!g_pmdlSystemCall)
+		return STATUS_UNSUCCESSFUL;
+	
+	MmBuildMdlForNonPagedPool(g_pmdlSystemCall);
+
+	// Change the flags of the MDL
+	g_pmdlSystemCall->MdlFlags = g_pmdlSystemCall->MdlFlags | MDL_MAPPED_TO_SYSTEM_VA;
+	MappedSystemCallTable = MmMapLockedPages(g_pmdlSystemCall, KernelMode); 
+	
+	return STATUS_SUCCESS;
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -58,6 +83,8 @@ VOID hook_ssdt(ULONG pid)
 	}
 	else
 		return;
+		
+	changeMDLPermission();	
 
 	if(is_xp)
 		hook_ssdt_entries();
@@ -75,13 +102,10 @@ VOID hook_ssdt(ULONG pid)
 //	Return value :
 //		None
 //	Process :
-//		Unset WP bit from CR0 register to be able to modify SSDT entries, restores the original values,
-//		and sets WP bit again.
+//		restores the original SSDT entries.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID unhook_ssdt_entries()
 {
-	disable_cr0();
-
 	if(oldNtCreateThread != NULL)
 		(NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX) = oldNtCreateThread;
 		
@@ -175,7 +199,6 @@ VOID unhook_ssdt_entries()
 	if(oldNtClose != NULL)
 		(NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX) = oldNtClose;
 		
-	enable_cr0();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -186,13 +209,10 @@ VOID unhook_ssdt_entries()
 //	Return value :
 //		None
 //	Process :
-//		Unset WP bit from CR0 register to be able to modify SSDT entries, restores the original values,
-//		and sets WP bit again.
+//		restores the original SSDT entries.
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID unhook_ssdt_entries_7()
 {
-	disable_cr0();
-
 	if(oldNtCreateThread != NULL)
 		(NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX) = oldNtCreateThread;
 		
@@ -294,8 +314,6 @@ VOID unhook_ssdt_entries_7()
 		
 	if(oldNtClose != NULL)
 		(NTCLOSE)SYSTEMSERVICE(CLOSE_7_INDEX) = oldNtClose;
-		
-	enable_cr0();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -306,13 +324,10 @@ VOID unhook_ssdt_entries_7()
 //	Return value :
 //		None
 //	Process :
-//		Unset WP bit from CR0 register to be able to modify SSDT entries, patch with our values after,
-//		saving the original ones, and set the WP bit again.
+//		Patch SSDT entries with our values after saving the original ones.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID hook_ssdt_entries()
 {
-	disable_cr0();
-	
 	oldNtCreateThread = (NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX);
 	(NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX) = newNtCreateThread;
 	
@@ -404,10 +419,7 @@ VOID hook_ssdt_entries()
 	(NTLOADDRIVER)SYSTEMSERVICE(LOADDRIVER_INDEX) = newNtLoadDriver;
 	
 	oldNtClose = (NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX);
-	(NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX) = newNtClose;
-	
-	enable_cr0();
-	
+	(NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX) = newNtClose;	
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -418,13 +430,10 @@ VOID hook_ssdt_entries()
 //	Return value :
 //		None
 //	Process :
-//		Unset WP bit from CR0 register to be able to modify SSDT entries, patch with our values after,
-//		saving the original ones, and set the WP bit again.
+//		Patch SSDT entries with our values after saving the original ones.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID hook_ssdt_entries_7()
 {
-	disable_cr0();
-	
 	oldNtCreateThread = (NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX);
 	(NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX) = newNtCreateThread;
 	
@@ -526,8 +535,6 @@ VOID hook_ssdt_entries_7()
 	
 	oldNtClose = (NTCLOSE)SYSTEMSERVICE(CLOSE_7_INDEX);
 	(NTCLOSE)SYSTEMSERVICE(CLOSE_7_INDEX) = newNtClose;
-
-	enable_cr0();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3301,49 +3308,4 @@ NTSTATUS newNtClose(HANDLE Handle)
 	}	
 	else
 		return ((NTCLOSE)(oldNtClose))(Handle);
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Unsets WP bit of CR0 register (allows writing into SSDT).
-//	Parameters :
-//		None
-//	Return value :
-//		None
-//	Notes :
-//		http://en.wikipedia.org/wiki/Control_register#CR0
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-VOID disable_cr0()
-{
-	__asm
-	{
-		push eax
-		mov eax, CR0
-		and eax, 0FFFEFFFFh
-		mov CR0, eax
-		pop eax
-	}
-
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Sets WP bit of CR0 register.
-//	Parameters :
-//		None
-//	Return value :
-//		None
-//	Notes :
-//		http://en.wikipedia.org/wiki/Control_register#CR0
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-VOID enable_cr0()
-{
-	__asm
-	{
-		push eax
-		mov eax, CR0
-		or eax, NOT 0FFFEFFFFh
-		mov CR0, eax
-		pop eax
-	}
 }

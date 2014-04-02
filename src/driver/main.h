@@ -91,6 +91,10 @@ ZWQUERYSYSTEMINFORMATION ZwQuerySystemInformation;
 // GLOBALS 
 /////////////////////////////////////////////////////////////////////////////
 
+// MDL stuff
+PMDL g_pmdlSystemCall;
+PVOID *MappedSystemCallTable;
+
 // registry callback cookie
 LARGE_INTEGER cookie;
 
