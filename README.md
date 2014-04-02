@@ -11,7 +11,7 @@ To-do :
 + etc.
 
 v0.6 changes :
-+ handle files deletion (through NtDeleteFile(), NtCreateFile()/NtClose() via FILE_DELETE_ON_CLOSE and NtSetInformationFile()
++ handle files deletion (through NtDeleteFile, NtCreateFile/NtClose via FILE_DELETE_ON_CLOSE and NtSetInformationFile)
 
 v0.5 changes :
 + bug fixes
@@ -27,18 +27,18 @@ v0.4 changes :
 
 v0.3 changes :
 + fix minor bugs
-+ fix NtTerminateProcess race condition (notify analyzer.py of process termination)
-+ fix hook NtDelayExecution => log the call before executing it
++ fix NtTerminateProcess() race condition (notify analyzer.py of process termination)
++ fix hook NtDelayExecution() => log the call before executing it
 + Signatures :]
 + some anti VM (virtualbox) detection features (based on pafish PoC)
-+ NtReadVirtualMemory hook
-+ NtResumeThread hook
++ NtReadVirtualMemory() hook
++ NtResumeThread() hook
 + handle driver execution (abort analysis)
 
 v0.2 changes :
-+ NtDeviceIoControlFile hook
-+ NtCreateMutant hook
-+ NtDelayExecution hook
-+ NtTerminateProcess hook
++ NtDeviceIoControlFile() hook
++ NtCreateMutant() hook
++ NtDelayExecution() hook
++ NtTerminateProcess() hook
 + Fixed deadlock issue (FltSendMessage infinite wait switched to 100ms timeout)
 + Fixed performance issues (drop) using userland app multithreading
