@@ -643,8 +643,7 @@ NTSTATUS newNtOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 			{
 				__try 
 				{
-					if(ExGetPreviousMode() != KernelMode)
-						ProbeForRead(ClientID, sizeof(CLIENT_ID), 1);
+					ProbeForRead(ClientID, sizeof(CLIENT_ID), 1);
 					kUniqueThread = (ULONG)ClientID->UniqueThread;
 				} 
 				__except (EXCEPTION_EXECUTE_HANDLER)
@@ -665,12 +664,10 @@ NTSTATUS newNtOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 			{
 				__try 
 				{
-					if(ExGetPreviousMode() != KernelMode)
-					{
-						ProbeForRead(ObjectAttributes, sizeof(OBJECT_ATTRIBUTES), 1);
-						ProbeForRead(ObjectAttributes->ObjectName, sizeof(UNICODE_STRING), 1);
-						ProbeForRead(ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length, 1);
-					}
+					ProbeForRead(ObjectAttributes, sizeof(OBJECT_ATTRIBUTES), 1);
+					ProbeForRead(ObjectAttributes->ObjectName, sizeof(UNICODE_STRING), 1);
+					ProbeForRead(ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length, 1);
+					
 					kObjectName.Length = ObjectAttributes->ObjectName->Length;
 					kObjectName.MaximumLength = ObjectAttributes->ObjectName->Length;
 					kObjectName.Buffer = ExAllocatePoolWithTag(NonPagedPool, kObjectName.MaximumLength, BUFFER_TAG);

@@ -57,7 +57,7 @@ NTSTATUS regCallback (PVOID CallbackContext, PVOID Argument1, PVOID Argument2)
 	ULONG pid = (ULONG)PsGetCurrentProcessId();
 	DWORD i = 0;
 	
-	if(!isProcessMonitoredByPid(pid))
+	if(!isProcessMonitoredByPid(pid) || ExGetPreviousMode() == KernelMode)
 		return STATUS_SUCCESS;
 	
 	pwBuf = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), BUFFER_TAG);
