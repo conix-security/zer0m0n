@@ -292,7 +292,7 @@ NTSTATUS ioctl_DeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	PCHAR outputBuffer = NULL;
 	DWORD sizeBuf;
 	ULONG pid;
-
+	
 	if(Irp == NULL || DeviceObject == NULL)
 		return STATUS_INVALID_PARAMETER;
 	
@@ -308,12 +308,31 @@ NTSTATUS ioctl_DeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 		
 			Irp->IoStatus.Status = status;
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);
-			if(NT_SUCCESS(status))
+		break;
+		
+		case IOCTL_CUCKOO_PATH:		
+		
+			cuckooPath = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), 'yoaH');
+			sizeBuf = pIoStackIrp->Parameters.DeviceIoControl.InputBufferLength;
+			if(sizeBuf  && sizeBuf < MAXSIZE)
+				RtlStringCchPrintfW(cuckooPath, MAXSIZE, L"\\??\\%ws", Irp->AssociatedIrp.SystemBuffer);
+			else
 			{
-				status = IoDeleteSymbolicLink(&usDosDeviceName);
-				IoDeleteDevice(DeviceObject);
+				#ifdef DEBUG
+				DbgPrint("IOCTL_CUCKOO_PATH : Buffer too large\n");
+				#endif DEBUG
+				return STATUS_BUFFER_TOO_SMALL;
 			}
+				
+			#ifdef DEBUG
+			DbgPrint("cuckooPath : %ws\n", cuckooPath);
+			#endif DEBUG
 			
+			Irp->IoStatus.Status = STATUS_SUCCESS;
+			IoCompleteRequest(Irp, IO_NO_INCREMENT);
+			
+			status = IoDeleteSymbolicLink(&usDosDeviceName);
+			IoDeleteDevice(DeviceObject);
 		break;
 		
 		default:

@@ -1,12 +1,16 @@
-zer0m0n v0.5
+zer0m0n v0.6
 ============
 
 zer0m0n is a driver for Cuckoo Sandbox, it will perform kernel analysis during the execution of a malware. There are many ways for a malware author to bypass Cuckoo detection, he can detect the hooks, hardcodes the Nt* functions to avoid the hooks, detect the virtual machine... The goal of this driver is to offer the possibility for the user to choose between the classical userland analysis or a kernel analysis, which will be harder to detect or bypass.
 
-Actually, it only works for XP 32 bit Windows machines, because of SSDT hooks usage ( :] ), but we plan supporting other OSes.
+Actually, it only works for XP and 7 32 bit Windows machines, because of SSDT hooks usage ( :] ), but we plan supporting other OSes.
 
 CHANGELOG
 =========
+
+v0.6
++ handle files deletion (through NtDeleteFile, NtCreateFile/NtClose via FILE_DELETE_ON_CLOSE and NtSetInformationFile)
++ cuckoo 1.1 compatibility
 
 v0.5
 + bug fixes
@@ -77,7 +81,7 @@ To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo 
   
     - copy the "logs_dispatcher.exe" and "zer0m0n.sys" files into your /cuckoo/analyzer/windows/dll/ folder
    
- 2- Open your virtual machine, it MUST run a "Windows XP x86" OS
+ 2- Open your virtual machine, it MUST run a "Windows XP x86" or a "Windows 7 x86" OS
 
  3- Install ActivePython 2.7 (http://www.activestate.com/activepython/downloads)
 

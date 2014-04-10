@@ -77,6 +77,7 @@
 #define CREATESECTION_INDEX 0x32
 #define USERCALLONEPARAM_INDEX 0x143
 #define LOADDRIVER_INDEX 0x61
+#define CLOSE_INDEX 0x19
 
 // Syscalls numbers (7)
 #define CREATETHREAD_7_INDEX 0x57
@@ -110,6 +111,7 @@
 #define CREATESECTION_7_INDEX 0x54
 #define USERCALLNOPARAM_7_INDEX 0x14d 
 #define LOADDRIVER_7_INDEX 0x9B
+#define CLOSE_7_INDEX 0x32
 
 typedef struct _ServiceDescriptorEntry {
      unsigned int *ServiceTableBase;
@@ -239,78 +241,80 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS {
 
 
 // Functions schemes definition
-typedef NTSTATUS(*ZWSETCONTEXTTHREAD)(HANDLE, PCONTEXT); 
-typedef NTSTATUS(*ZWMAPVIEWOFSECTION)(HANDLE, HANDLE, PVOID, ULONG_PTR, SIZE_T, PLARGE_INTEGER, PSIZE_T, SECTION_INHERIT, ULONG, ULONG);
-typedef NTSTATUS(*ZWCREATETHREAD)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, PCLIENT_ID, PCONTEXT, PINITIAL_TEB, BOOLEAN);
-typedef NTSTATUS(*ZWCREATETHREADEX)(PHANDLE, ACCESS_MASK, PVOID, HANDLE, PVOID, PVOID, BOOLEAN, ULONG, ULONG, ULONG, PVOID);
-typedef NTSTATUS(*ZWQUEUEAPCTHREAD)(HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, ULONG);
-typedef NTSTATUS(*ZWSYSTEMDEBUGCONTROL)(SYSDBG_COMMAND, PVOID, ULONG, PVOID, ULONG, PULONG);
-typedef NTSTATUS(*ZWCREATEPROCESS)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, BOOLEAN, HANDLE, HANDLE, HANDLE);
-typedef NTSTATUS(*ZWCREATEPROCESSEX)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, BOOLEAN, HANDLE, HANDLE, HANDLE, HANDLE);
-typedef NTSTATUS(*ZWCREATEUSERPROCESS)(PHANDLE, PHANDLE, ACCESS_MASK, ACCESS_MASK, POBJECT_ATTRIBUTES, POBJECT_ATTRIBUTES, ULONG, ULONG, PRTL_USER_PROCESS_PARAMETERS, PVOID, PVOID);
-typedef NTSTATUS(*ZWWRITEVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
-typedef NTSTATUS(*ZWDEBUGACTIVEPROCESS)(HANDLE, HANDLE);
-typedef NTSTATUS(*ZWOPENPROCESS)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PCLIENT_ID);
-typedef NTSTATUS(*ZWOPENTHREAD)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PCLIENT_ID);
-typedef NTSTATUS(*ZWQUERYSYSTEMINFORMATION)(SYSTEM_INFORMATION_CLASS, PVOID, ULONG, PULONG);
-typedef NTSTATUS(*ZWCREATEFILE)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PIO_STATUS_BLOCK, PLARGE_INTEGER, ULONG, ULONG, ULONG, ULONG, PVOID, ULONG);
-typedef NTSTATUS(*ZWREADFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, PVOID, ULONG, PLARGE_INTEGER, PULONG);
-typedef NTSTATUS(*ZWWRITEFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, PVOID, ULONG, PLARGE_INTEGER, PULONG);
-typedef NTSTATUS(*ZWDELETEFILE)(POBJECT_ATTRIBUTES);
-typedef NTSTATUS(*ZWSETINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
-typedef NTSTATUS(*ZWQUERYINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
-typedef NTSTATUS(*ZWCREATEMUTANT)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, BOOLEAN);
-typedef NTSTATUS(*ZWDEVICEIOCONTROLFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, ULONG, PVOID, ULONG, PVOID, ULONG);
-typedef NTSTATUS(*ZWTERMINATEPROCESS)(HANDLE, NTSTATUS);
-typedef NTSTATUS(*ZWDELAYEXECUTION)(BOOLEAN, PLARGE_INTEGER);
-typedef NTSTATUS(*ZWQUERYVALUEKEY)(HANDLE, PUNICODE_STRING, KEY_VALUE_INFORMATION_CLASS, PVOID, ULONG, PULONG);
-typedef NTSTATUS(*ZWQUERYATTRIBUTESFILE)(POBJECT_ATTRIBUTES, PFILE_BASIC_INFORMATION);
-typedef NTSTATUS(*ZWREADVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
-typedef NTSTATUS(*ZWRESUMETHREAD)(HANDLE, PULONG);
-typedef NTSTATUS(*ZWCREATESECTION)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PLARGE_INTEGER, ULONG, ULONG, HANDLE);
-typedef NTSTATUS(*ZWLOADDRIVER)(PUNICODE_STRING);
+typedef NTSTATUS(*NTSETCONTEXTTHREAD)(HANDLE, PCONTEXT); 
+typedef NTSTATUS(*NTMAPVIEWOFSECTION)(HANDLE, HANDLE, PVOID, ULONG_PTR, SIZE_T, PLARGE_INTEGER, PSIZE_T, SECTION_INHERIT, ULONG, ULONG);
+typedef NTSTATUS(*NTCREATETHREAD)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, PCLIENT_ID, PCONTEXT, PINITIAL_TEB, BOOLEAN);
+typedef NTSTATUS(*NTCREATETHREADEX)(PHANDLE, ACCESS_MASK, PVOID, HANDLE, PVOID, PVOID, BOOLEAN, ULONG, ULONG, ULONG, PVOID);
+typedef NTSTATUS(*NTQUEUEAPCTHREAD)(HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, ULONG);
+typedef NTSTATUS(*NTSYSTEMDEBUGCONTROL)(SYSDBG_COMMAND, PVOID, ULONG, PVOID, ULONG, PULONG);
+typedef NTSTATUS(*NTCREATEPROCESS)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, BOOLEAN, HANDLE, HANDLE, HANDLE);
+typedef NTSTATUS(*NTCREATEPROCESSEX)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, HANDLE, BOOLEAN, HANDLE, HANDLE, HANDLE, HANDLE);
+typedef NTSTATUS(*NTCREATEUSERPROCESS)(PHANDLE, PHANDLE, ACCESS_MASK, ACCESS_MASK, POBJECT_ATTRIBUTES, POBJECT_ATTRIBUTES, ULONG, ULONG, PRTL_USER_PROCESS_PARAMETERS, PVOID, PVOID);
+typedef NTSTATUS(*NTWRITEVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
+typedef NTSTATUS(*NTDEBUGACTIVEPROCESS)(HANDLE, HANDLE);
+typedef NTSTATUS(*NTOPENPROCESS)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PCLIENT_ID);
+typedef NTSTATUS(*NTOPENTHREAD)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PCLIENT_ID);
+typedef NTSTATUS(*NTQUERYSYSTEMINFORMATION)(SYSTEM_INFORMATION_CLASS, PVOID, ULONG, PULONG);
+typedef NTSTATUS(*NTCREATEFILE)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PIO_STATUS_BLOCK, PLARGE_INTEGER, ULONG, ULONG, ULONG, ULONG, PVOID, ULONG);
+typedef NTSTATUS(*NTREADFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, PVOID, ULONG, PLARGE_INTEGER, PULONG);
+typedef NTSTATUS(*NTWRITEFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, PVOID, ULONG, PLARGE_INTEGER, PULONG);
+typedef NTSTATUS(*NTDELETEFILE)(POBJECT_ATTRIBUTES);
+typedef NTSTATUS(*NTSETINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
+typedef NTSTATUS(*NTQUERYINFORMATIONFILE)(HANDLE, PIO_STATUS_BLOCK, PVOID, ULONG, FILE_INFORMATION_CLASS);
+typedef NTSTATUS(*NTCREATEMUTANT)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, BOOLEAN);
+typedef NTSTATUS(*NTDEVICEIOCONTROLFILE)(HANDLE, HANDLE, PIO_APC_ROUTINE, PVOID, PIO_STATUS_BLOCK, ULONG, PVOID, ULONG, PVOID, ULONG);
+typedef NTSTATUS(*NTTERMINATEPROCESS)(HANDLE, NTSTATUS);
+typedef NTSTATUS(*NTDELAYEXECUTION)(BOOLEAN, PLARGE_INTEGER);
+typedef NTSTATUS(*NTQUERYVALUEKEY)(HANDLE, PUNICODE_STRING, KEY_VALUE_INFORMATION_CLASS, PVOID, ULONG, PULONG);
+typedef NTSTATUS(*NTQUERYATTRIBUTESFILE)(POBJECT_ATTRIBUTES, PFILE_BASIC_INFORMATION);
+typedef NTSTATUS(*NTREADVIRTUALMEMORY)(HANDLE, PVOID, PVOID, ULONG, PULONG);
+typedef NTSTATUS(*NTRESUMETHREAD)(HANDLE, PULONG);
+typedef NTSTATUS(*NTCREATESECTION)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PLARGE_INTEGER, ULONG, ULONG, HANDLE);
+typedef NTSTATUS(*NTLOADDRIVER)(PUNICODE_STRING);
+typedef NTSTATUS(*NTCLOSE)(HANDLE);
 
 // shadow ssdt
-typedef ULONG(*ZWUSERCALLONEPARAM)(ULONG, ULONG);
-typedef ULONG(*ZWUSERCALLNOPARAM)(DWORD);
+typedef ULONG(*NTUSERCALLONEPARAM)(ULONG, ULONG);
+typedef ULONG(*NTUSERCALLNOPARAM)(DWORD);
 
 /////////////////////////////////////////////////////////////////////////////		
 // GLOBALS
 /////////////////////////////////////////////////////////////////////////////
 
 // original functions addresses
-ZWMAPVIEWOFSECTION oldZwMapViewOfSection;
-ZWSETCONTEXTTHREAD oldZwSetContextThread;
-ZWCREATETHREAD oldZwCreateThread;
-ZWCREATETHREADEX oldZwCreateThreadEx;
-ZWQUEUEAPCTHREAD oldZwQueueApcThread;
-ZWCREATEPROCESS oldZwCreateProcess;
-ZWSYSTEMDEBUGCONTROL oldZwSystemDebugControl;
-ZWCREATEPROCESSEX oldZwCreateProcessEx;
-ZWCREATEUSERPROCESS oldZwCreateUserProcess;
-ZWWRITEVIRTUALMEMORY oldZwWriteVirtualMemory;
-ZWDEBUGACTIVEPROCESS oldZwDebugActiveProcess;
-ZWOPENPROCESS oldZwOpenProcess;
-ZWOPENTHREAD oldZwOpenThread;
-ZWQUERYSYSTEMINFORMATION oldZwQuerySystemInformation;
-ZWCREATEFILE oldZwCreateFile;
-ZWREADFILE oldZwReadFile;
-ZWWRITEFILE oldZwWriteFile;
-ZWDELETEFILE oldZwDeleteFile;
-ZWSETINFORMATIONFILE oldZwSetInformationFile;
-ZWQUERYINFORMATIONFILE oldZwQueryInformationFile;
-ZWCREATEMUTANT oldZwCreateMutant;
-ZWDEVICEIOCONTROLFILE oldZwDeviceIoControlFile;
-ZWTERMINATEPROCESS oldZwTerminateProcess;
-ZWDELAYEXECUTION oldZwDelayExecution;
-ZWQUERYVALUEKEY oldZwQueryValueKey;
-ZWQUERYATTRIBUTESFILE oldZwQueryAttributesFile;
-ZWREADVIRTUALMEMORY oldZwReadVirtualMemory;
-ZWRESUMETHREAD oldZwResumeThread;
-ZWCREATESECTION oldZwCreateSection;
-ZWUSERCALLONEPARAM oldZwUserCallOneParam;
-ZWUSERCALLNOPARAM oldZwUserCallNoParam;
-ZWLOADDRIVER oldZwLoadDriver;
+NTMAPVIEWOFSECTION oldNtMapViewOfSection;
+NTSETCONTEXTTHREAD oldNtSetContextThread;
+NTCREATETHREAD oldNtCreateThread;
+NTCREATETHREADEX oldNtCreateThreadEx;
+NTQUEUEAPCTHREAD oldNtQueueApcThread;
+NTCREATEPROCESS oldNtCreateProcess;
+NTSYSTEMDEBUGCONTROL oldNtSystemDebugControl;
+NTCREATEPROCESSEX oldNtCreateProcessEx;
+NTCREATEUSERPROCESS oldNtCreateUserProcess;
+NTWRITEVIRTUALMEMORY oldNtWriteVirtualMemory;
+NTDEBUGACTIVEPROCESS oldNtDebugActiveProcess;
+NTOPENPROCESS oldNtOpenProcess;
+NTOPENTHREAD oldNtOpenThread;
+NTQUERYSYSTEMINFORMATION oldNtQuerySystemInformation;
+NTCREATEFILE oldNtCreateFile;
+NTREADFILE oldNtReadFile;
+NTWRITEFILE oldNtWriteFile;
+NTDELETEFILE oldNtDeleteFile;
+NTSETINFORMATIONFILE oldNtSetInformationFile;
+NTQUERYINFORMATIONFILE oldNtQueryInformationFile;
+NTCREATEMUTANT oldNtCreateMutant;
+NTDEVICEIOCONTROLFILE oldNtDeviceIoControlFile;
+NTTERMINATEPROCESS oldNtTerminateProcess;
+NTDELAYEXECUTION oldNtDelayExecution;
+NTQUERYVALUEKEY oldNtQueryValueKey;
+NTQUERYATTRIBUTESFILE oldNtQueryAttributesFile;
+NTREADVIRTUALMEMORY oldNtReadVirtualMemory;
+NTRESUMETHREAD oldNtResumeThread;
+NTCREATESECTION oldNtCreateSection;
+NTUSERCALLONEPARAM oldNtUserCallOneParam;
+NTUSERCALLNOPARAM oldNtUserCallNoParam;
+NTLOADDRIVER oldNtLoadDriver;
+NTCLOSE oldNtClose;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
@@ -318,9 +322,13 @@ __declspec(dllimport) KeAddSystemServiceTable(ULONG,ULONG,ULONG,ULONG,ULONG);
 
 pServiceDescriptorTableEntry KeServiceDescriptorTableShadow;
 
+// cuckoo path (where the files about to be delete will be moved)
+PWCHAR cuckooPath;
+
 /////////////////////////////////////////////////////////////////////////////		
 // FUNCTIONS
 /////////////////////////////////////////////////////////////////////////////
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -384,6 +392,336 @@ VOID unhook_ssdt_entries_7();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
+//		Logs thread opening, and hides specific processes from the monitored processes.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/bb432382(v=vs.85).aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/bb432382(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientID);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process opening (mandatory for most of code injection techniques), and hides specific processes from the monitored processes.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567022(v=vs.85).aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567022(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientID);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process information retrieval, and hides specific processes from the monitored processes.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/desktop/ms725506(v=vs.85).aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/desktop/ms725506(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs virtual memory modification.
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtWriteVirtualMemory.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtWriteVirtualMemory.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToWrite, PULONG NumberOfBytesWritten);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process creation.
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Process/NtCreateProcess.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Process/NtCreateProcess.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtCreateProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ParentProcess, BOOLEAN InheritObjectTable, HANDLE SectionHandle, HANDLE DebugPort, HANDLE ExceptionPort);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process creation.
+//	Parameters :
+//		See http://www.tech-archive.net/Archive/Development/microsoft.public.win32.programmer.kernel/2004-02/0195.html (lulz)
+//	Return value :
+//		See http://www.tech-archive.net/Archive/Development/microsoft.public.win32.programmer.kernel/2004-02/0195.html (lulz)
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE InheritFromProcessHandle, BOOLEAN InheritHandles, HANDLE SectionHandle, HANDLE DebugPort, HANDLE ExceptionPort, HANDLE jesaispas);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process creation.
+//	Parameters :
+//		See http://www.rohitab.com/discuss/topic/40191-ntcreateuserprocess/ (lulz)
+//	Return value :
+//		See http://www.rohitab.com/discuss/topic/40191-ntcreateuserprocess/ (lulz)
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtCreateUserProcess(PHANDLE ProcessHandle, PHANDLE ThreadHandle, ACCESS_MASK ProcessDesiredAccess, ACCESS_MASK ThreadDesiredAccess, POBJECT_ATTRIBUTES ProcessObjectAttributes, POBJECT_ATTRIBUTES ThreadObjectAttributes, ULONG ProcessFlags, ULONG ThreadFlags, PVOID ProcessParameters, PVOID CreateInfo, PVOID AttributeList);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs thread-based Asynchronous Procedure Call creation (may be used for code injection).
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/APC/NtQueueApcThread.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/APC/NtQueueApcThread.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtQueueApcThread(HANDLE ThreadHandle, PIO_APC_ROUTINE ApcRoutine, PVOID ApcRoutineContext, PIO_STATUS_BLOCK ApcStatusBlock, ULONG ApcReserved);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs thread creation.
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtCreateThread.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtCreateThread.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PCLIENT_ID ClientId, PCONTEXT ThreadContext, PINITIAL_TEB InitialTeb, BOOLEAN CreateSuspended);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs section mapping (may be used for code injection).
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566481(v=vs.85).aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566481(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtMapViewOfSection(HANDLE SectionHandle, HANDLE ProcessHandle, PVOID *BaseAddress, ULONG_PTR ZeroBits, SIZE_T CommitSize, PLARGE_INTEGER SectionOffset, PSIZE_T ViewSize, SECTION_INHERIT InheritDisposition, ULONG AllocationType, ULONG Win32Protect);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs thread context manipulation (may be used for code injection).
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/Thread%20Context/NtSetContextThread.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/Thread%20Context/NtSetContextThread.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtSetContextThread(HANDLE ThreadHandle, PCONTEXT Context);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process debugging operations (may be used for code injection).
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Debug/NtSystemDebugControl.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Debug/NtSystemDebugControl.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtSystemDebugControl(SYSDBG_COMMAND Command, PVOID InputBuffer, ULONG InputBufferLength, PVOID OutputBuffer, ULONG OutputBufferLength, PULONG ReturnLength);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process debugging (may be used for code injection).
+//	Parameters :
+//		See http://www.openrce.org/articles/full_view/26
+//	Return value :
+//		See http://www.openrce.org/articles/full_view/26
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtDebugActiveProcess(HANDLE ProcessHandle, HANDLE DebugHandle);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs file creation and/or file opening.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566424(v=vs.85).aspx
+//  Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566424(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PIO_STATUS_BLOCK IoStatusBlock, PLARGE_INTEGER AllocationSize, ULONG FileAttributes, ULONG ShareAccess, ULONG CreateDisposition, ULONG CreateOptions, PVOID EaBuffer, ULONG EaLength);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs file reading.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567072(v=vs.85).aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567072(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtReadFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRoutine, PVOID ApcContext, PIO_STATUS_BLOCK IoStatusBlock, PVOID Buffer, ULONG Length, PLARGE_INTEGER ByteOffset, PULONG Key);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs file modification.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567121(v=vs.85).aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567121(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtWriteFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRoutine, PVOID ApcContext, PIO_STATUS_BLOCK IoStatusBlock, PVOID Buffer, ULONG Length, PLARGE_INTEGER ByteOffset, PULONG Key);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs file deletion.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566435(v=vs.85).aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566435(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs file deletion / rename.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567096(v=vs.85).aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567096(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlock, PVOID FileInformation, ULONG Length, FILE_INFORMATION_CLASS FileInformationClass);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs file information access.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567052(v=vs.85).aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567052(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlock, PVOID FileInformation, ULONG Length, FILE_INFORMATION_CLASS FileInformationClass);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs mutex creation.
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, BOOLEAN InitialOwner);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Logs IOCTLs.
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566441%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566441%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtDeviceIoControlFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRoutine, PVOID ApcContext, PIO_STATUS_BLOCK IoStatusBlock, ULONG IoControlCode, PVOID InputBuffer, ULONG InputBufferLength, PVOID OuputBuffer, ULONG OutputBufferLength);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Logs process termination.
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567115%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567115%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Logs delay execution.
+//  Parameters :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtDelayExecution.html
+//  Return value :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtDelayExecution.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Hide VBOX keys.
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtQueryValueKey(HANDLE KeyHandle, PUNICODE_STRING ValueName, KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass, PVOID KeyValueInformation, ULONG Length, PULONG ResultLength);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Hide VBOX files
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtQueryAttributesFile(POBJECT_ATTRIBUTES ObjectAttributes, PFILE_BASIC_INFORMATION FileInformation);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs virtual memory read.
+//	Parameters :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
+//	Return value :
+//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Logs resume thread
+//  Parameters :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
+//  Return value :
+//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtResumeThread(HANDLE ThreadHandle, PULONG SuspendCount);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs process name creation.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566428%28v=vs.85%29.aspx
+//	Return value :
+//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566428%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtCreateSection(PHANDLE SectionHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PLARGE_INTEGER MaximumSize, ULONG SectionPageProtection, ULONG AllocationAttributes, HANDLE FileHandle);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Blocks shutdown attempts through ExWindowsEx
+//	Parameters :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallOneParam
+//	Return value :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallOneParam
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ULONG newNtUserCallOneParam(ULONG Param, ULONG Routine);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Blocks shutdown attempts through ExWindowsEx (on Win7)
+//	Parameters :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallNoParam
+//	Return value :
+//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallNoParam
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ULONG newNtUserCallNoParam(ULONG Routine);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Block driver loading.
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566470%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566470%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtLoadDriver(PUNICODE_STRING DriverServiceName);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs thread creation.
+//	Parameters :
+//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
+//	Return value :
+//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtCreateThreadEx(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PVOID StartAddress, PVOID Parameter, BOOLEAN CreateSuspended, ULONG StackZeroBits, ULONG SizeOfStackCommit, ULONG SizeOfStackReserve, PVOID BytesBuffer);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  Description :
+//  	Dumps files which are about to be deleted (FILE_DELETE_ON_CLOSE)
+//  Parameters :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566417%28v=vs.85%29.aspx
+//  Return value :
+//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566417%28v=vs.85%29.aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtClose(HANDLE Handle);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
 //		Unsets WP bit of CR0 register (allows writing into SSDT).
 //		See http://en.wikipedia.org/wiki/Control_register#CR0
 //	Parameters :
@@ -402,326 +740,4 @@ void disable_cr0();
 //		None
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void enable_cr0();
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs thread opening, and hides specific processes from the monitored processes.
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/bb432382(v=vs.85).aspx
-//	Return value :
-//		See http://msdn.microsoft.com/en-us/library/bb432382(v=vs.85).aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientID);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs process opening (mandatory for most of code injection techniques), and hides specific processes from the monitored processes.
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567022(v=vs.85).aspx
-//	Return value :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567022(v=vs.85).aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientID);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs process information retrieval, and hides specific processes from the monitored processes.
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/windows/desktop/ms725506(v=vs.85).aspx
-//	Return value :
-//		See http://msdn.microsoft.com/en-us/library/windows/desktop/ms725506(v=vs.85).aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs virtual memory modification.
-//	Parameters :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtWriteVirtualMemory.html
-//	Return value :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtWriteVirtualMemory.html
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToWrite, PULONG NumberOfBytesWritten);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs process creation.
-//	Parameters :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Process/NtCreateProcess.html
-//	Return value :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Process/NtCreateProcess.html
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwCreateProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ParentProcess, BOOLEAN InheritObjectTable, HANDLE SectionHandle, HANDLE DebugPort, HANDLE ExceptionPort);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs process creation.
-//	Parameters :
-//		See http://www.tech-archive.net/Archive/Development/microsoft.public.win32.programmer.kernel/2004-02/0195.html (lulz)
-//	Return value :
-//		See http://www.tech-archive.net/Archive/Development/microsoft.public.win32.programmer.kernel/2004-02/0195.html (lulz)
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE InheritFromProcessHandle, BOOLEAN InheritHandles, HANDLE SectionHandle, HANDLE DebugPort, HANDLE ExceptionPort, HANDLE jesaispas);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs process creation.
-//	Parameters :
-//		See http://www.rohitab.com/discuss/topic/40191-ntcreateuserprocess/ (lulz)
-//	Return value :
-//		See http://www.rohitab.com/discuss/topic/40191-ntcreateuserprocess/ (lulz)
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwCreateUserProcess(PHANDLE ProcessHandle, PHANDLE ThreadHandle, ACCESS_MASK ProcessDesiredAccess, ACCESS_MASK ThreadDesiredAccess, POBJECT_ATTRIBUTES ProcessObjectAttributes, POBJECT_ATTRIBUTES ThreadObjectAttributes, ULONG ProcessFlags, ULONG ThreadFlags, PVOID ProcessParameters, PVOID CreateInfo, PVOID AttributeList);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs thread-based Asynchronous Procedure Call creation (may be used for code injection).
-//	Parameters :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/APC/NtQueueApcThread.html
-//	Return value :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/APC/NtQueueApcThread.html
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwQueueApcThread(HANDLE ThreadHandle, PIO_APC_ROUTINE ApcRoutine, PVOID ApcRoutineContext, PIO_STATUS_BLOCK ApcStatusBlock, ULONG ApcReserved);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs thread creation.
-//	Parameters :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtCreateThread.html
-//	Return value :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtCreateThread.html
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PCLIENT_ID ClientId, PCONTEXT ThreadContext, PINITIAL_TEB InitialTeb, BOOLEAN CreateSuspended);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs section mapping (may be used for code injection).
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566481(v=vs.85).aspx
-//	Return value :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566481(v=vs.85).aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwMapViewOfSection(HANDLE SectionHandle, HANDLE ProcessHandle, PVOID *BaseAddress, ULONG_PTR ZeroBits, SIZE_T CommitSize, PLARGE_INTEGER SectionOffset, PSIZE_T ViewSize, SECTION_INHERIT InheritDisposition, ULONG AllocationType, ULONG Win32Protect);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs thread context manipulation (may be used for code injection).
-//	Parameters :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/Thread%20Context/NtSetContextThread.html
-//	Return value :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/Thread%20Context/NtSetContextThread.html
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwSetContextThread(HANDLE ThreadHandle, PCONTEXT Context);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs process debugging operations (may be used for code injection).
-//	Parameters :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Debug/NtSystemDebugControl.html
-//	Return value :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Debug/NtSystemDebugControl.html
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwSystemDebugControl(SYSDBG_COMMAND Command, PVOID InputBuffer, ULONG InputBufferLength, PVOID OutputBuffer, ULONG OutputBufferLength, PULONG ReturnLength);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs process debugging (may be used for code injection).
-//	Parameters :
-//		See http://www.openrce.org/articles/full_view/26
-//	Return value :
-//		See http://www.openrce.org/articles/full_view/26
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwDebugActiveProcess(HANDLE ProcessHandle, HANDLE DebugHandle);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs file creation and/or file opening.
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566424(v=vs.85).aspx
-//  Return value :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566424(v=vs.85).aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PIO_STATUS_BLOCK IoStatusBlock, PLARGE_INTEGER AllocationSize, ULONG FileAttributes, ULONG ShareAccess, ULONG CreateDisposition, ULONG CreateOptions, PVOID EaBuffer, ULONG EaLength);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs file reading.
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567072(v=vs.85).aspx
-//	Return value :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567072(v=vs.85).aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwReadFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRoutine, PVOID ApcContext, PIO_STATUS_BLOCK IoStatusBlock, PVOID Buffer, ULONG Length, PLARGE_INTEGER ByteOffset, PULONG Key);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs file modification.
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567121(v=vs.85).aspx
-//	Return value :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567121(v=vs.85).aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwWriteFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRoutine, PVOID ApcContext, PIO_STATUS_BLOCK IoStatusBlock, PVOID Buffer, ULONG Length, PLARGE_INTEGER ByteOffset, PULONG Key);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs file deletion.
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566435(v=vs.85).aspx
-//	Return value :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566435(v=vs.85).aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs file deletion / rename.
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567096(v=vs.85).aspx
-//	Return value :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567096(v=vs.85).aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwSetInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlock, PVOID FileInformation, ULONG Length, FILE_INFORMATION_CLASS FileInformationClass);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs file information access.
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567052(v=vs.85).aspx
-//	Return value :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567052(v=vs.85).aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwQueryInformationFile(HANDLE FileHandle, PIO_STATUS_BLOCK IoStatusBlock, PVOID FileInformation, ULONG Length, FILE_INFORMATION_CLASS FileInformationClass);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs mutex creation.
-//	Parameters :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
-//	Return value :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Mutant/NtCreateMutant.html
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, BOOLEAN InitialOwner);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  Description :
-//  	Logs IOCTLs.
-//  Parameters :
-//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566441%28v=vs.85%29.aspx
-//  Return value :
-//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566441%28v=vs.85%29.aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwDeviceIoControlFile(HANDLE FileHandle, HANDLE Event, PIO_APC_ROUTINE ApcRoutine, PVOID ApcContext, PIO_STATUS_BLOCK IoStatusBlock, ULONG IoControlCode, PVOID InputBuffer, ULONG InputBufferLength, PVOID OuputBuffer, ULONG OutputBufferLength);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  Description :
-//  	Logs process termination.
-//  Parameters :
-//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567115%28v=vs.85%29.aspx
-//  Return value :
-//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567115%28v=vs.85%29.aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwTerminateProcess(HANDLE ProcessHandle, NTSTATUS ExitStatus);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  Description :
-//  	Logs delay execution.
-//  Parameters :
-//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtDelayExecution.html
-//  Return value :
-//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtDelayExecution.html
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwDelayExecution(BOOLEAN Alertable, PLARGE_INTEGER DelayInterval);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  Description :
-//  	Hide VBOX keys.
-//  Parameters :
-//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
-//  Return value :
-//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff567069%28v=vs.85%29.aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwQueryValueKey(HANDLE KeyHandle, PUNICODE_STRING ValueName, KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass, PVOID KeyValueInformation, ULONG Length, PULONG ResultLength);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  Description :
-//  	Hide VBOX files
-//  Parameters :
-//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
-//  Return value :
-//  	See http://msdn.microsoft.com/en-us/library/cc512135%28v=vs.85%29.aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwQueryAttributesFile(POBJECT_ATTRIBUTES ObjectAttributes, PFILE_BASIC_INFORMATION FileInformation);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs virtual memory read.
-//	Parameters :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
-//	Return value :
-//		See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/Memory%20Management/Virtual%20Memory/NtReadVirtualMemory.html
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToRead, PULONG NumberOfBytesReaded);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  Description :
-//  	Logs resume thread
-//  Parameters :
-//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
-//  Return value :
-//  	See http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Thread/NtResumeThread.html
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwResumeThread(HANDLE ThreadHandle, PULONG SuspendCount);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs process name creation.
-//	Parameters :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566428%28v=vs.85%29.aspx
-//	Return value :
-//		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566428%28v=vs.85%29.aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwCreateSection(PHANDLE SectionHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PLARGE_INTEGER MaximumSize, ULONG SectionPageProtection, ULONG AllocationAttributes, HANDLE FileHandle);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Blocks shutdown attempts through ExWindowsEx
-//	Parameters :
-//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallOneParam
-//	Return value :
-//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallOneParam
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-ULONG newZwUserCallOneParam(ULONG Param, ULONG Routine);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Blocks shutdown attempts through ExWindowsEx (on Win7)
-//	Parameters :
-//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallNoParam
-//	Return value :
-//		https://www.reactos.org/wiki/Techwiki:Win32k/NtUserCallNoParam
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-ULONG newZwUserCallNoParam(ULONG Routine);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//  Description :
-//  	Block driver loading.
-//  Parameters :
-//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566470%28v=vs.85%29.aspx
-//  Return value :
-//  	See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566470%28v=vs.85%29.aspx
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwLoadDriver(PUNICODE_STRING DriverServiceName);
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
-//		Logs thread creation.
-//	Parameters :
-//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
-//	Return value :
-//		See http://securityxploded.com/ntcreatethreadex.php (lulz)
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS newZwCreateThreadEx(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, HANDLE ProcessHandle, PVOID StartAddress, PVOID Parameter, BOOLEAN CreateSuspended, ULONG StackZeroBits, ULONG SizeOfStackCommit, ULONG SizeOfStackReserve, PVOID BytesBuffer);
-
-
 #endif

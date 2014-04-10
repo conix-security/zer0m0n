@@ -92,4 +92,15 @@ ULONG getPIDByThreadHandle(HANDLE hThread);
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 PWCHAR wcsistr(PWCHAR haystack, PWCHAR needle);
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Move the file given as parameter to the cuckoo directory
+//	Parameters :
+//		_in_  UNICODE_STRING filepath : the file to be moved
+//		_out_ PUNICODE_STRING filepath_to_dump : the new pathfile (after the file has been moved)  	
+//	Return value :
+//		STATUS_SUCCESS if the file has correctly been moved, otherwise return error message
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS dump_file(UNICODE_STRING filepath, PUNICODE_STRING filepath_to_dump);
+
 #endif

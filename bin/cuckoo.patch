@@ -1,826 +1,958 @@
-diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.py
---- original/analyzer/windows/analyzer.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/analyzer.py	2014-03-17 14:29:04.979406435 +0100
-@@ -64,6 +64,12 @@ def add_pid(pid):
+diff -rupN new/analyzer/windows/analyzer.py original/analyzer/windows/analyzer.py
+--- new/analyzer/windows/analyzer.py	2014-04-07 16:41:07.977525936 +0200
++++ original/analyzer/windows/analyzer.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -64,12 +64,6 @@ def add_pid(pid):
          log.info("Added new process to list with pid: %s", pid)
          PROCESS_LIST.append(pid)
  
-+def remove_pid(pid):
-+    """Remove a process to process list."""
-+    if type(pid) == long or type(pid) == int or type(pid) == str:
-+        log.info("Process with pid %s has terminated", pid)
-+        PROCESS_LIST.remove(pid)
-+
+-def remove_pid(pid):
+-    """Remove a process to process list."""
+-    if type(pid) == long or type(pid) == int or type(pid) == str:
+-        log.info("Process with pid %s has terminated", pid)
+-        PROCESS_LIST.remove(pid)
+-
  def add_pids(pids):
      """Add PID."""
      if type(pids) == list:
-@@ -220,6 +226,40 @@ class PipeHandler(Thread):
+@@ -226,40 +220,6 @@ class PipeHandler(Thread):
                      response = "\x00"
                  else:
                      response = hookdll_encode(url_dlls)
-+            
-+            # remove pid from process list because we received a notification
-+            # from kernel land
-+            elif command.startswith("KTERMINATE:"):
-+                data = command[11:]
-+                process_id = int(data)
-+                if process_id:
-+                    if process_id in PROCESS_LIST:
-+                        remove_pid(process_id) 
-+
-+            # same than below but we don't want to inject any DLLs because
-+            # it's a kernel analysis
-+            elif command.startswith("KPROCESS:"):
-+                PROCESS_LOCK.acquire()
-+                data = command[9:]
-+                process_id = int(data)
-+                thread_id = None
-+                if process_id:
-+                    if process_id not in (PID, PPID):
-+                        if process_id not in PROCESS_LIST:
-+                            proc = Process(pid=process_id,thread_id=thread_id)
-+                            filepath = proc.get_filepath()
-+                            filename = os.path.basename(filepath)
-+
-+                            if not protected_filename(filename):
-+                                add_pids(process_id)
-+                                log.info("Announce process name : %s", filename)
-+                PROCESS_LOCK.release()                
-+
-+            # if a new driver has been loaded, we stop the analysis
-+            elif command == "KSUBVERT":
-+                for pid in PROCESS_LIST:
-+                    log.info("Process with pid %s has terminated", pid)
-+                    PROCESS_LIST.remove(pid)
+-            
+-            # remove pid from process list because we received a notification
+-            # from kernel land
+-            elif command.startswith("KTERMINATE:"):
+-                data = command[11:]
+-                process_id = int(data)
+-                if process_id:
+-                    if process_id in PROCESS_LIST:
+-                        remove_pid(process_id) 
+-
+-            # same than below but we don't want to inject any DLLs because
+-            # it's a kernel analysis
+-            elif command.startswith("KPROCESS:"):
+-                PROCESS_LOCK.acquire()
+-                data = command[9:]
+-                process_id = int(data)
+-                thread_id = None
+-                if process_id:
+-                    if process_id not in (PID, PPID):
+-                        if process_id not in PROCESS_LIST:
+-                            proc = Process(pid=process_id,thread_id=thread_id)
+-                            filepath = proc.get_filepath()
+-                            filename = os.path.basename(filepath)
+-
+-                            if not protected_filename(filename):
+-                                add_pids(process_id)
+-                                log.info("Announce process name : %s", filename)
+-                PROCESS_LOCK.release()                
+-
+-            # if a new driver has been loaded, we stop the analysis
+-            elif command == "KSUBVERT":
+-                for pid in PROCESS_LIST:
+-                    log.info("Process with pid %s has terminated", pid)
+-                    PROCESS_LIST.remove(pid)
  
              # In case of PID, the client is trying to notify the creation of
              # a new process to be injected and monitored.
-@@ -612,6 +652,7 @@ class Analyzer:
+@@ -652,7 +612,6 @@ class Analyzer:
              pid_check = False
  
          time_counter = 0
-+        kernel_analysis = self.get_options().get("kernel_analysis", None)
+-        kernel_analysis = self.get_options().get("kernel_analysis", None)
  
          while True:
              time_counter += 1
-@@ -630,17 +671,20 @@ class Analyzer:
+@@ -671,20 +630,17 @@ class Analyzer:
                  # If the process monitor is enabled we start checking whether
                  # the monitored processes are still alive.
                  if pid_check:
--                    for pid in PROCESS_LIST:
--                        if not Process(pid=pid).is_alive():
--                            log.info("Process with pid %s has terminated", pid)
--                            PROCESS_LIST.remove(pid)
-+                    if kernel_analysis is False:
-+                        for pid in PROCESS_LIST:
-+                            if not Process(pid=pid).is_alive():
-+                                log.info("Process with pid %s has terminated", pid)
-+                                PROCESS_LIST.remove(pid)
+-                    if kernel_analysis is False:
+-                        for pid in PROCESS_LIST:
+-                            if not Process(pid=pid).is_alive():
+-                                log.info("Process with pid %s has terminated", pid)
+-                                PROCESS_LIST.remove(pid)
++                    for pid in PROCESS_LIST:
++                        if not Process(pid=pid).is_alive():
++                            log.info("Process with pid %s has terminated", pid)
++                            PROCESS_LIST.remove(pid)
  
                      # If none of the monitored processes are still alive, we
                      # can terminate the analysis.
                      if len(PROCESS_LIST) == 0:
--                        log.info("Process list is empty, "
--                                 "terminating analysis...")
--                        break
-+                       KERNEL32.Sleep(1000)
-+                       if len(PROCESS_LIST) == 0:
-+                            log.info("Process list is empty, "
-+                                     "terminating analysis...")
-+                            break
+-                       KERNEL32.Sleep(1000)
+-                       if len(PROCESS_LIST) == 0:
+-                            log.info("Process list is empty, "
+-                                     "terminating analysis...")
+-                            break
++                        log.info("Process list is empty, "
++                                 "terminating analysis...")
++                        break
  
                      # Update the list of monitored processes available to the
                      # analysis package. It could be used for internal
-@@ -689,14 +733,15 @@ class Analyzer:
+@@ -733,15 +689,14 @@ class Analyzer:
          # that we clean up remaining open handles (sockets, files, etc.).
          log.info("Terminating remaining processes before shutdown...")
  
--        for pid in PROCESS_LIST:
--            proc = Process(pid=pid)
--            if proc.is_alive():
--                try:
--                    proc.terminate()
--                except:
--                    continue
--
-+        if kernel_analysis is False: 
-+            for pid in PROCESS_LIST:
-+                proc = Process(pid=pid)
-+                if proc.is_alive():
-+                    try:
-+                        proc.terminate()
-+                    except:
-+                        continue
-+        
+-        if kernel_analysis is False: 
+-            for pid in PROCESS_LIST:
+-                proc = Process(pid=pid)
+-                if proc.is_alive():
+-                    try:
+-                        proc.terminate()
+-                    except:
+-                        continue
+-        
++        for pid in PROCESS_LIST:
++            proc = Process(pid=pid)
++            if proc.is_alive():
++                try:
++                    proc.terminate()
++                except:
++                    continue
++
          # Let's invoke the completion procedure.
          self.complete()
  
-diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib/api/process.py
---- original/analyzer/windows/lib/api/process.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/lib/api/process.py	2014-03-17 14:29:05.152739758 +0100
-@@ -5,14 +5,16 @@
+diff -rupN new/analyzer/windows/lib/api/process.py original/analyzer/windows/lib/api/process.py
+--- new/analyzer/windows/lib/api/process.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/lib/api/process.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,20 +1,18 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
  import os
  import logging
  import random
-+import win32file
-+import win32api
+-import win32file
+-import win32api
  from time import time
  from ctypes import byref, c_ulong, create_string_buffer, c_int, sizeof
  from shutil import copy
  
  from lib.common.constants import PIPE, PATHS
  from lib.common.defines import KERNEL32, NTDLL, SYSTEM_INFO, STILL_ACTIVE
--from lib.common.defines import THREAD_ALL_ACCESS, PROCESS_ALL_ACCESS
--from lib.common.defines import STARTUPINFO, PROCESS_INFORMATION
-+from lib.common.defines import THREAD_ALL_ACCESS, PROCESS_ALL_ACCESS, TH32CS_SNAPPROCESS
-+from lib.common.defines import STARTUPINFO, PROCESS_INFORMATION, PROCESSENTRY32
+-from lib.common.defines import THREAD_ALL_ACCESS, PROCESS_ALL_ACCESS, TH32CS_SNAPPROCESS
+-from lib.common.defines import STARTUPINFO, PROCESS_INFORMATION, PROCESSENTRY32
++from lib.common.defines import THREAD_ALL_ACCESS, PROCESS_ALL_ACCESS
++from lib.common.defines import STARTUPINFO, PROCESS_INFORMATION
  from lib.common.defines import CREATE_NEW_CONSOLE, CREATE_SUSPENDED
  from lib.common.defines import MEM_RESERVE, MEM_COMMIT, PAGE_READWRITE
  from lib.common.defines import MEMORY_BASIC_INFORMATION
-@@ -21,6 +23,9 @@ from lib.common.rand import random_strin
+@@ -23,10 +21,6 @@ from lib.common.rand import random_strin
  from lib.common.results import NetlogFile
  from lib.core.config import Config
  
-+IOCTL_PID = 0x222008
-+PATH_KERNEL_DRIVER = "\\\\.\\DriverSSDT"
-+
+-IOCTL_PID = 0x222008
+-IOCTL_CUCKOO_PATH = 0x22200C
+-PATH_KERNEL_DRIVER = "\\\\.\\DriverSSDT"
+-
  log = logging.getLogger(__name__)
  
  def randomize_dll(dll_path):
-@@ -174,7 +179,7 @@ class Process:
+@@ -180,7 +174,7 @@ class Process:
  
          return None
  
--    def execute(self, path, args=None, suspended=False):
-+    def execute(self, path, args=None, suspended=False, kernel_analysis=False):
+-    def execute(self, path, args=None, suspended=False, kernel_analysis=False):
++    def execute(self, path, args=None, suspended=False):
          """Execute sample process.
          @param path: sample path.
          @param args: process args.
-@@ -218,6 +223,98 @@ class Process:
+@@ -224,100 +218,6 @@ class Process:
              self.h_thread = process_info.hThread
              log.info("Successfully executed process from path \"%s\" with "
                       "arguments \"%s\" with pid %d", path, args, self.pid)
-+	    
-+            """ send pid to kernel driver """
-+            if kernel_analysis == True:
-+                log.info("Starting kernel analysis")
-+                log.info("Installing driver")
-+                sys_file = os.path.join(os.getcwd(), "dll", "zer0m0n.sys")
-+                exe_file = os.path.join(os.getcwd(), "dll", "logs_dispatcher.exe")
-+                if not sys_file or not exe_file or not os.path.exists(sys_file) or not os.path.exists(exe_file):
-+                        log.warning("No valid zer0m0n files to be used for process with pid %d, injection aborted", self.pid)
-+                        return False
-+                
-+                exe_name = random_string(6)
-+                service_name = random_string(6)
-+                driver_name = random_string(6)
-+                inf_data = '[Version]\r\nSignature = "$Windows NT$"\r\nClass = "ActivityMonitor"\r\nClassGuid = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}\r\nProvider= %Prov%\r\nDriverVer = 22/01/2014,1.0.0.0\r\nCatalogFile = %DriverName%.cat\r\n[DestinationDirs]\r\nDefaultDestDir = 12\r\nMiniFilter.DriverFiles = 12\r\n[DefaultInstall]\r\nOptionDesc = %ServiceDescription%\r\nCopyFiles = MiniFilter.DriverFiles\r\n[DefaultInstall.Services]\r\nAddService = %ServiceName%,,MiniFilter.Service\r\n[DefaultUninstall]\r\nDelFiles = MiniFilter.DriverFiles\r\n[DefaultUninstall.Services]\r\nDelService = %ServiceName%,0x200\r\n[MiniFilter.Service]\r\nDisplayName= %ServiceName%\r\nDescription= %ServiceDescription%\r\nServiceBinary= %12%\\%DriverName%.sys\r\nDependencies = "FltMgr"\r\nServiceType = 2\r\nStartType = 3\r\nErrorControl = 1\r\nLoadOrderGroup = "FSFilter Activity Monitor"\r\nAddReg = MiniFilter.AddRegistry\r\n[MiniFilter.AddRegistry]\r\nHKR,,"DebugFlags",0x00010001 ,0x0\r\nHKR,"Instances","DefaultInstance",0x00000000,%DefaultInstance%\r\nHKR,"Instances\\"%Instance1.Name%,"Altitude",0x00000000,%Instance1.Altitude%\r\nHKR,"Instances\\"%Instance1.Name%,"Flags",0x00010001,%Instance1.Flags%\r\n[MiniFilter.DriverFiles]\r\n%DriverName%.sys\r\n[SourceDisksFiles]\r\n'+driver_name+'.sys = 1,,\r\n[SourceDisksNames]\r\n1 = %DiskId1%,,,\r\n[Strings]\r\n'+'Prov = "'+random_string(8)+'"\r\nServiceDescription = "'+random_string(12)+'"\r\nServiceName = "'+service_name+'"\r\nDriverName = "'+driver_name+'"\r\nDiskId1 = "'+service_name+' Device Installation Disk"\r\nDefaultInstance = "'+service_name+' Instance"\r\nInstance1.Name = "'+service_name+' Instance"\r\nInstance1.Altitude = "370050"\r\nInstance1.Flags = 0x0'
-+                
-+                new_inf = os.path.join(os.getcwd(), "dll", "{0}.inf".format(service_name))
-+                new_sys = os.path.join(os.getcwd(), "dll", "{0}.sys".format(driver_name))
-+                copy(sys_file, new_sys)
-+                new_exe = os.path.join(os.getcwd(), "dll", "{0}.exe".format(exe_name))
-+                copy(exe_file, new_exe)
-+                log.info("[-] Driver name : "+new_sys)
-+                log.info("[-] Inf name : "+new_inf)
-+                log.info("[-] Application name : "+new_exe)
-+                log.info("[-] Service : "+service_name)
-+                
-+                fh = open(new_inf,"w")
-+                fh.write(inf_data)
-+                fh.close()
-+                
-+                os.system("rundll32 setupapi.dll, InstallHinfSection DefaultInstall 132 "+new_inf)
-+                os.system("net start "+service_name)
-+                
-+                si = STARTUPINFO()
-+                si.cb = sizeof(startup_info)
-+                pi = PROCESS_INFORMATION()
-+                cr = CREATE_NEW_CONSOLE 
-+                
-+                log.info("Starting "+exe_name+".exe")
-+                ldp = KERNEL32.CreateProcessA(new_exe,
-+                                              None,
-+                                              None,
-+                                              None,
-+                                              None,
-+                                              cr,
-+                                              None,
-+                                              os.getenv("TEMP"),
-+                                              byref(si),
-+                                              byref(pi))
-+                if not ldp:
-+                    log.error("Failed starting "+exe_name+".exe.")
-+                    return False
-+		
-+                config_path = os.path.join(os.getenv("TEMP"), "%s.ini" % self.pid)
-+                with open(config_path, "w") as config:
-+                    cfg = Config("analysis.conf")
-+
-+                    config.write("host-ip={0}\n".format(cfg.ip))
-+                    config.write("host-port={0}\n".format(cfg.port))
-+                    config.write("pipe={0}\n".format(PIPE))
-+                
-+                log.info("Sending startup information")
-+                hFile = win32file.CreateFile(PATH_KERNEL_DRIVER, win32file.GENERIC_READ|win32file.GENERIC_WRITE,
-+                                         0, None, win32file.OPEN_EXISTING, 0, None)
-+                if hFile:
-+                    p = Process(pid=os.getpid())
-+                    ppid = p.get_parent_pid()
-+                    pid_vboxservice = 0
-+                    pid_vboxtray = 0
-+
-+                    # get pid of VBoxService.exe and VBoxTray.exe
-+                    proc_info = PROCESSENTRY32()
-+                    proc_info.dwSize = sizeof(PROCESSENTRY32)
-+
-+                    snapshot = KERNEL32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-+                    flag = KERNEL32.Process32First(snapshot, byref(proc_info))
-+                    while flag:
-+                        if proc_info.sz_exeFile == "VBoxService.exe":
-+                            log.info("VBoxService.exe found !")
-+                            pid_vboxservice = proc_info.th32ProcessID
-+                            flag = 0 
-+                        elif proc_info.sz_exeFile == "VBoxTray.exe":
-+                            pid_vboxtray = proc_info.th32ProcessID
-+                            log.info("VBoxTray.exe found !")
-+                            flag = 0
-+                        flag = KERNEL32.Process32Next(snapshot, byref(proc_info)) 
-+                    msg = str(self.pid)+"_"+str(ppid)+"_"+str(os.getpid())+"_"+str(pi.dwProcessId)+"_"+str(pid_vboxservice)+"_"+str(pid_vboxtray)+'\0'
-+                    win32file.DeviceIoControl(hFile, IOCTL_PID, msg, None)
-+                else:
-+                    log.warning("Failed to access kernel driver")
-+            
-+            
+-	    
+-            """ send pid to kernel driver """
+-            if kernel_analysis == True:
+-                log.info("Starting kernel analysis")
+-                log.info("Installing driver")
+-                sys_file = os.path.join(os.getcwd(), "dll", "zer0m0n.sys")
+-                exe_file = os.path.join(os.getcwd(), "dll", "logs_dispatcher.exe")
+-                if not sys_file or not exe_file or not os.path.exists(sys_file) or not os.path.exists(exe_file):
+-                        log.warning("No valid zer0m0n files to be used for process with pid %d, injection aborted", self.pid)
+-                        return False
+-                
+-                exe_name = random_string(6)
+-                service_name = random_string(6)
+-                driver_name = random_string(6)
+-                inf_data = '[Version]\r\nSignature = "$Windows NT$"\r\nClass = "ActivityMonitor"\r\nClassGuid = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}\r\nProvider= %Prov%\r\nDriverVer = 22/01/2014,1.0.0.0\r\nCatalogFile = %DriverName%.cat\r\n[DestinationDirs]\r\nDefaultDestDir = 12\r\nMiniFilter.DriverFiles = 12\r\n[DefaultInstall]\r\nOptionDesc = %ServiceDescription%\r\nCopyFiles = MiniFilter.DriverFiles\r\n[DefaultInstall.Services]\r\nAddService = %ServiceName%,,MiniFilter.Service\r\n[DefaultUninstall]\r\nDelFiles = MiniFilter.DriverFiles\r\n[DefaultUninstall.Services]\r\nDelService = %ServiceName%,0x200\r\n[MiniFilter.Service]\r\nDisplayName= %ServiceName%\r\nDescription= %ServiceDescription%\r\nServiceBinary= %12%\\%DriverName%.sys\r\nDependencies = "FltMgr"\r\nServiceType = 2\r\nStartType = 3\r\nErrorControl = 1\r\nLoadOrderGroup = "FSFilter Activity Monitor"\r\nAddReg = MiniFilter.AddRegistry\r\n[MiniFilter.AddRegistry]\r\nHKR,,"DebugFlags",0x00010001 ,0x0\r\nHKR,"Instances","DefaultInstance",0x00000000,%DefaultInstance%\r\nHKR,"Instances\\"%Instance1.Name%,"Altitude",0x00000000,%Instance1.Altitude%\r\nHKR,"Instances\\"%Instance1.Name%,"Flags",0x00010001,%Instance1.Flags%\r\n[MiniFilter.DriverFiles]\r\n%DriverName%.sys\r\n[SourceDisksFiles]\r\n'+driver_name+'.sys = 1,,\r\n[SourceDisksNames]\r\n1 = %DiskId1%,,,\r\n[Strings]\r\n'+'Prov = "'+random_string(8)+'"\r\nServiceDescription = "'+random_string(12)+'"\r\nServiceName = "'+service_name+'"\r\nDriverName = "'+driver_name+'"\r\nDiskId1 = "'+service_name+' Device Installation Disk"\r\nDefaultInstance = "'+service_name+' Instance"\r\nInstance1.Name = "'+service_name+' Instance"\r\nInstance1.Altitude = "370050"\r\nInstance1.Flags = 0x0'
+-                
+-                new_inf = os.path.join(os.getcwd(), "dll", "{0}.inf".format(service_name))
+-                new_sys = os.path.join(os.getcwd(), "dll", "{0}.sys".format(driver_name))
+-                copy(sys_file, new_sys)
+-                new_exe = os.path.join(os.getcwd(), "dll", "{0}.exe".format(exe_name))
+-                copy(exe_file, new_exe)
+-                log.info("[-] Driver name : "+new_sys)
+-                log.info("[-] Inf name : "+new_inf)
+-                log.info("[-] Application name : "+new_exe)
+-                log.info("[-] Service : "+service_name)
+-                
+-                fh = open(new_inf,"w")
+-                fh.write(inf_data)
+-                fh.close()
+-                
+-                os.system("rundll32 setupapi.dll, InstallHinfSection DefaultInstall 132 "+new_inf)
+-                os.system("net start "+service_name)
+-                
+-                si = STARTUPINFO()
+-                si.cb = sizeof(startup_info)
+-                pi = PROCESS_INFORMATION()
+-                cr = CREATE_NEW_CONSOLE 
+-                
+-                log.info("Starting "+exe_name+".exe")
+-                ldp = KERNEL32.CreateProcessA(new_exe,
+-                                              None,
+-                                              None,
+-                                              None,
+-                                              None,
+-                                              cr,
+-                                              None,
+-                                              os.getenv("TEMP"),
+-                                              byref(si),
+-                                              byref(pi))
+-                if not ldp:
+-                    log.error("Failed starting "+exe_name+".exe.")
+-                    return False
+-		
+-                config_path = os.path.join(os.getenv("TEMP"), "%s.ini" % self.pid)
+-                with open(config_path, "w") as config:
+-                    cfg = Config("analysis.conf")
+-
+-                    config.write("host-ip={0}\n".format(cfg.ip))
+-                    config.write("host-port={0}\n".format(cfg.port))
+-                    config.write("pipe={0}\n".format(PIPE))
+-                
+-                log.info("Sending startup information")
+-                hFile = win32file.CreateFile(PATH_KERNEL_DRIVER, win32file.GENERIC_READ|win32file.GENERIC_WRITE,
+-                                         0, None, win32file.OPEN_EXISTING, 0, None)
+-                if hFile:
+-                    p = Process(pid=os.getpid())
+-                    ppid = p.get_parent_pid()
+-                    pid_vboxservice = 0
+-                    pid_vboxtray = 0
+-
+-                    # get pid of VBoxService.exe and VBoxTray.exe
+-                    proc_info = PROCESSENTRY32()
+-                    proc_info.dwSize = sizeof(PROCESSENTRY32)
+-
+-                    snapshot = KERNEL32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+-                    flag = KERNEL32.Process32First(snapshot, byref(proc_info))
+-                    while flag:
+-                        if proc_info.sz_exeFile == "VBoxService.exe":
+-                            log.info("VBoxService.exe found !")
+-                            pid_vboxservice = proc_info.th32ProcessID
+-                            flag = 0 
+-                        elif proc_info.sz_exeFile == "VBoxTray.exe":
+-                            pid_vboxtray = proc_info.th32ProcessID
+-                            log.info("VBoxTray.exe found !")
+-                            flag = 0
+-                        flag = KERNEL32.Process32Next(snapshot, byref(proc_info)) 
+-                    msg = str(self.pid)+"_"+str(ppid)+"_"+str(os.getpid())+"_"+str(pi.dwProcessId)+"_"+str(pid_vboxservice)+"_"+str(pid_vboxtray)+'\0'
+-                    win32file.DeviceIoControl(hFile, IOCTL_PID, msg, None)
+-                    msg = os.getcwd()+'\0'
+-                    win32file.DeviceIoControl(hFile, IOCTL_CUCKOO_PATH, unicode(msg), None)
+-                else:
+-                    log.warning("Failed to access kernel driver")
+-            
+-            
              return True
          else:
              log.error("Failed to execute process from path \"%s\" with "
-@@ -316,10 +413,10 @@ class Process:
+@@ -416,9 +316,9 @@ class Process:
  
              # The first time we come up with a random startup-time.
              if Process.first_process:
--                # This adds 1 up to 30 times of 20 minutes to the startup
--                # time of the process, therefore bypassing anti-vm checks
--                # which check whether the VM has only been up for <10 minutes.
--                Process.startup_time = random.randint(1, 30) * 20 * 60 * 1000
-+               # This adds 1 up to 30 times of 20 minutes to the startup
-+               # time of the process, therefore bypassing anti-vm checks
-+               # which check whether the VM has only been up for <10 minutes.
-+               Process.startup_time = random.randint(1, 30) * 20 * 60 * 1000
+-               # This adds 1 up to 30 times of 20 minutes to the startup
+-               # time of the process, therefore bypassing anti-vm checks
+-               # which check whether the VM has only been up for <10 minutes.
++                # This adds 1 up to 30 times of 20 minutes to the startup
++                # time of the process, therefore bypassing anti-vm checks
++                # which check whether the VM has only been up for <10 minutes.
+                 Process.startup_time = random.randint(1, 30) * 20 * 60 * 1000
  
              config.write("host-ip={0}\n".format(cfg.ip))
-             config.write("host-port={0}\n".format(cfg.port))
-@@ -372,7 +469,7 @@ class Process:
+@@ -472,7 +372,7 @@ class Process:
                  return False
              else:
                  KERNEL32.CloseHandle(thread_handle)
--
-+            
+-            
++
          return True
  
      def wait(self):
-diff -rupN original/analyzer/windows/lib/common/defines.py new/analyzer/windows/lib/common/defines.py
---- original/analyzer/windows/lib/common/defines.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/lib/common/defines.py	2014-03-17 14:29:05.126073091 +0100
-@@ -74,6 +74,8 @@ WM_GETTEXT                = 0x0000000D
+diff -rupN new/analyzer/windows/lib/common/defines.py original/analyzer/windows/lib/common/defines.py
+--- new/analyzer/windows/lib/common/defines.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/lib/common/defines.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -74,8 +74,6 @@ WM_GETTEXT                = 0x0000000D
  WM_GETTEXTLENGTH          = 0x0000000E
  BM_CLICK                  = 0x000000F5
  
-+TH32CS_SNAPPROCESS = 0x02L
-+
+-TH32CS_SNAPPROCESS = 0x02L
+-
  class STARTUPINFO(Structure):
      _fields_ = [
          ("cb",            DWORD),        
-@@ -104,6 +106,20 @@ class PROCESS_INFORMATION(Structure):
+@@ -106,20 +104,6 @@ class PROCESS_INFORMATION(Structure):
          ("dwThreadId",  DWORD),
          ]
  
-+class PROCESSENTRY32(Structure):
-+    _fields_ = [
-+        ("dwSize", DWORD),
-+        ("cntUsage", DWORD),
-+        ("th32ProcessID", DWORD),
-+        ("th32DefaultHeapID", DWORD),
-+        ("th32ModuleID", DWORD),
-+        ("cntThreads", DWORD),
-+        ("th32ParentProcessID", DWORD),
-+        ("pcPriClassBase", DWORD),
-+        ("dwFlags", DWORD),
-+        ("sz_exeFile", c_char * 260)
-+        ]
-+
+-class PROCESSENTRY32(Structure):
+-    _fields_ = [
+-        ("dwSize", DWORD),
+-        ("cntUsage", DWORD),
+-        ("th32ProcessID", DWORD),
+-        ("th32DefaultHeapID", DWORD),
+-        ("th32ModuleID", DWORD),
+-        ("cntThreads", DWORD),
+-        ("th32ParentProcessID", DWORD),
+-        ("pcPriClassBase", DWORD),
+-        ("dwFlags", DWORD),
+-        ("sz_exeFile", c_char * 260)
+-        ]
+-
  class LUID(Structure):
      _fields_ = [
          ("LowPart", DWORD),
-diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/windows/modules/packages/applet.py
---- original/analyzer/windows/modules/packages/applet.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/applet.py	2014-03-17 14:29:05.089406427 +0100
-@@ -50,6 +50,9 @@ class Applet(Package):
+diff -rupN new/analyzer/windows/modules/packages/applet.py original/analyzer/windows/modules/packages/applet.py
+--- new/analyzer/windows/modules/packages/applet.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/applet.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -50,9 +50,6 @@ class Applet(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
          class_name = self.options.get("class", None)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
-@@ -57,11 +60,13 @@ class Applet(Package):
+@@ -60,13 +57,11 @@ class Applet(Package):
          html_path = self.make_html(path, class_name)
  
          p = Process()
--        if not p.execute(path=browser, args="\"%s\"" % html_path, suspended=suspended):
-+        if not p.execute(path=browser, args="\"%s\"" % html_path, suspended=suspended,kernel_analysis=kernel_analysis):
+-        if not p.execute(path=browser, args="\"%s\"" % html_path, suspended=suspended,kernel_analysis=kernel_analysis):
++        if not p.execute(path=browser, args="\"%s\"" % html_path, suspended=suspended):
              raise CuckooPackageError("Unable to execute initial Internet "
                                       "Explorer process, analysis aborted")
  
          if not free and suspended:
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
              p.inject(dll)
              p.resume()
              return p.pid
-diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/windows/modules/packages/bin.py
---- original/analyzer/windows/modules/packages/bin.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/bin.py	2014-03-17 14:29:05.089406427 +0100
-@@ -11,8 +11,12 @@ class Shellcode(Package):
+diff -rupN new/analyzer/windows/modules/packages/bin.py original/analyzer/windows/modules/packages/bin.py
+--- new/analyzer/windows/modules/packages/bin.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/bin.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -11,12 +11,8 @@ class Shellcode(Package):
      def start(self, path):
          p = Process()
          dll = self.options.get("dll")
--        p.execute(path="bin/execsc.exe", args=path, suspended=True)
--        p.inject(dll)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
-+        p.execute(path="bin/execsc.exe", args=path, suspended=True,kernel_analysis=kernel_analysis)
-+        if not kernel_analysis:
-+            p.inject(dll)
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
+-        p.execute(path="bin/execsc.exe", args=path, suspended=True,kernel_analysis=kernel_analysis)
+-        if not kernel_analysis:
+-            p.inject(dll)
++        p.execute(path="bin/execsc.exe", args=path, suspended=True)
++        p.inject(dll)
          p.resume()
  
          return p.pid
-diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/windows/modules/packages/cpl.py
---- original/analyzer/windows/modules/packages/cpl.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/cpl.py	2014-03-17 14:29:05.089406427 +0100
-@@ -26,18 +26,22 @@ class CPL(Package):
+diff -rupN new/analyzer/windows/modules/packages/cpl.py original/analyzer/windows/modules/packages/cpl.py
+--- new/analyzer/windows/modules/packages/cpl.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/cpl.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -26,22 +26,18 @@ class CPL(Package):
  
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
  
          p = Process()
          if not p.execute(path=control, args="\"%s\"" % path,
--                         suspended=suspended):
-+                         suspended=suspended,kernel_analysis=kernel_analysis):
+-                         suspended=suspended,kernel_analysis=kernel_analysis):
++                         suspended=suspended):
              raise CuckooPackageError("Unable to execute initial Control "
                                       "process, analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              return p.pid
          else:
-diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/windows/modules/packages/dll.py
---- original/analyzer/windows/modules/packages/dll.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/dll.py	2014-03-17 14:29:05.096073094 +0100
-@@ -14,6 +14,9 @@ class Dll(Package):
+diff -rupN new/analyzer/windows/modules/packages/dll.py original/analyzer/windows/modules/packages/dll.py
+--- new/analyzer/windows/modules/packages/dll.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/dll.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -14,9 +14,6 @@ class Dll(Package):
          function = self.options.get("function", "DllMain")
          arguments = self.options.get("arguments", None)
          dll = self.options.get("dll", None)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
-@@ -23,12 +26,13 @@ class Dll(Package):
+@@ -26,13 +23,12 @@ class Dll(Package):
              args += " {0}".format(arguments)
  
          p = Process()
--        if not p.execute(path="C:\\WINDOWS\\system32\\rundll32.exe", args=args, suspended=suspended):
-+        if not p.execute(path="C:\\WINDOWS\\system32\\rundll32.exe", args=args, suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path="C:\\WINDOWS\\system32\\rundll32.exe", args=args, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path="C:\\WINDOWS\\system32\\rundll32.exe", args=args, suspended=suspended):
              raise CuckooPackageError("Unable to execute rundll32, "
                                       "analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              return p.pid
          else:
-diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/windows/modules/packages/doc.py
---- original/analyzer/windows/modules/packages/doc.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/doc.py	2014-03-17 14:29:05.089406427 +0100
-@@ -37,17 +37,22 @@ class DOC(Package):
+diff -rupN new/analyzer/windows/modules/packages/doc.py original/analyzer/windows/modules/packages/doc.py
+--- new/analyzer/windows/modules/packages/doc.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/doc.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -37,22 +37,17 @@ class DOC(Package):
  
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
-+
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
+-
          suspended = True
          if free:
              suspended = False
  
          p = Process()
--        if not p.execute(path=word, args="\"%s\"" % path, suspended=suspended):
-+        if not p.execute(path=word, args="\"%s\"" % path, suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path=word, args="\"%s\"" % path, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=word, args="\"%s\"" % path, suspended=suspended):
              raise CuckooPackageError("Unable to execute initial Microsoft "
                                       "Office Word process, analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              return p.pid
          else:
-diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/windows/modules/packages/exe.py
---- original/analyzer/windows/modules/packages/exe.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/exe.py	2014-03-17 14:29:05.086073094 +0100
-@@ -13,17 +13,21 @@ class Exe(Package):
+diff -rupN new/analyzer/windows/modules/packages/exe.py original/analyzer/windows/modules/packages/exe.py
+--- new/analyzer/windows/modules/packages/exe.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/exe.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -13,21 +13,17 @@ class Exe(Package):
          free = self.options.get("free", False)
          args = self.options.get("arguments", None)
          dll = self.options.get("dll", None)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
  
          p = Process()
--        if not p.execute(path=path, args=args, suspended=suspended):
-+        if not p.execute(path=path, args=args, suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path=path, args=args, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=path, args=args, suspended=suspended):
              raise CuckooPackageError("Unable to execute initial process, "
                                       "analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              p.close()
              return p.pid
-diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/windows/modules/packages/generic.py
---- original/analyzer/windows/modules/packages/generic.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/generic.py	2014-03-17 14:29:05.089406427 +0100
-@@ -14,6 +14,9 @@ class Genric(Package):
+diff -rupN new/analyzer/windows/modules/packages/generic.py original/analyzer/windows/modules/packages/generic.py
+--- new/analyzer/windows/modules/packages/generic.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/generic.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -14,9 +14,6 @@ class Genric(Package):
      def start(self, path):
          free = self.options.get("free", False)
          dll = self.options.get("dll", None)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
-@@ -22,12 +25,13 @@ class Genric(Package):
+@@ -25,13 +22,12 @@ class Genric(Package):
          cmd_args = "/c start \"{0}\"".format(path)
  
          p = Process()
--        if not p.execute(path=cmd_path, args=cmd_args, suspended=suspended):
-+        if not p.execute(path=cmd_path, args=cmd_args, suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path=cmd_path, args=cmd_args, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=cmd_path, args=cmd_args, suspended=suspended):
              raise CuckooPackageError("Unable to execute initial process, "
                                       "analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              p.close()
              return p.pid
-diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windows/modules/packages/html.py
---- original/analyzer/windows/modules/packages/html.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/html.py	2014-03-17 14:29:05.089406427 +0100
-@@ -14,6 +14,9 @@ class HTML(Package):
+diff -rupN new/analyzer/windows/modules/packages/html.py original/analyzer/windows/modules/packages/html.py
+--- new/analyzer/windows/modules/packages/html.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/html.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -14,9 +14,6 @@ class HTML(Package):
      def start(self, path):
          free = self.options.get("free", False)
          dll = self.options.get("dll", None)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
-@@ -21,12 +24,13 @@ class HTML(Package):
+@@ -24,13 +21,12 @@ class HTML(Package):
          iexplore = os.path.join(os.getenv("ProgramFiles"), "Internet Explorer", "iexplore.exe")
  
          p = Process()
--        if not p.execute(path=iexplore, args="\"%s\"" % path, suspended=suspended):
-+        if not p.execute(path=iexplore, args="\"%s\"" % path, suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path=iexplore, args="\"%s\"" % path, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=iexplore, args="\"%s\"" % path, suspended=suspended):
              raise CuckooPackageError("Unable to execute initial Internet "
                                       "Explorer process, analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              return p.pid
          else:
-diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows/modules/packages/ie.py
---- original/analyzer/windows/modules/packages/ie.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/ie.py	2014-03-17 14:29:05.096073094 +0100
-@@ -15,6 +15,9 @@ class IE(Package):
+diff -rupN new/analyzer/windows/modules/packages/ie.py original/analyzer/windows/modules/packages/ie.py
+--- new/analyzer/windows/modules/packages/ie.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/ie.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -15,9 +15,6 @@ class IE(Package):
      def start(self, url):
          free = self.options.get("free", False)
          dll = self.options.get("dll", None)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
-@@ -22,12 +25,13 @@ class IE(Package):
+@@ -25,13 +22,12 @@ class IE(Package):
          iexplore = os.path.join(os.getenv("ProgramFiles"), "Internet Explorer", "iexplore.exe")
  
          p = Process()
--        if not p.execute(path=iexplore, args="\"%s\"" % url, suspended=suspended):
-+        if not p.execute(path=iexplore, args="\"%s\"" % url, suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path=iexplore, args="\"%s\"" % url, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=iexplore, args="\"%s\"" % url, suspended=suspended):
              raise CuckooPackageError("Unable to execute initial Internet "
                                       "Explorer process, analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              return p.pid
          else:
-diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/windows/modules/packages/jar.py
---- original/analyzer/windows/modules/packages/jar.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/jar.py	2014-03-17 14:29:05.096073094 +0100
-@@ -33,6 +33,9 @@ class Jar(Package):
+diff -rupN new/analyzer/windows/modules/packages/jar.py original/analyzer/windows/modules/packages/jar.py
+--- new/analyzer/windows/modules/packages/jar.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/jar.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -33,9 +33,6 @@ class Jar(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
          class_path = self.options.get("class", None)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
-@@ -43,12 +46,13 @@ class Jar(Package):
+@@ -46,13 +43,12 @@ class Jar(Package):
              args = "-jar \"%s\"" % path
  
          p = Process()
--        if not p.execute(path=java, args=args, suspended=suspended):
-+        if not p.execute(path=java, args=args, suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path=java, args=args, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=java, args=args, suspended=suspended):
              raise CuckooPackageError("Unable to execute initial Java "
                                       "process, analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              return p.pid
          else:
-diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/windows/modules/packages/pdf.py
---- original/analyzer/windows/modules/packages/pdf.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/pdf.py	2014-03-17 14:29:05.096073094 +0100
-@@ -34,17 +34,21 @@ class PDF(Package):
+diff -rupN new/analyzer/windows/modules/packages/pdf.py original/analyzer/windows/modules/packages/pdf.py
+--- new/analyzer/windows/modules/packages/pdf.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/pdf.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -34,21 +34,17 @@ class PDF(Package):
  
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
  
          p = Process()
--        if not p.execute(path=reader, args="\"%s\"" % path, suspended=suspended):
-+        if not p.execute(path=reader, args="\"%s\"" % path, suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path=reader, args="\"%s\"" % path, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=reader, args="\"%s\"" % path, suspended=suspended):
              raise CuckooPackageError("Unable to execute initial Adobe Reader "
                                       "process, analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              return p.pid
          else:
-diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/windows/modules/packages/vbs.py
---- original/analyzer/windows/modules/packages/vbs.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/vbs.py	2014-03-17 14:29:05.099406428 +0100
-@@ -33,17 +33,21 @@ class VBS(Package):
+diff -rupN new/analyzer/windows/modules/packages/ps1.py original/analyzer/windows/modules/packages/ps1.py
+--- new/analyzer/windows/modules/packages/ps1.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/ps1.py	2014-04-07 13:27:36.000000000 +0200
+@@ -33,10 +33,6 @@ class PS1(Package):
  
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
+-
+         suspended = True
+         if free:
+             suspended = False
+@@ -44,12 +40,11 @@ class PS1(Package):
+         args = "-NoProfile -ExecutionPolicy unrestricted -File \"{0}\"".format(path)
+ 
+         p = Process()
+-        if not p.execute(path=powershell, args=args, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=powershell, args=args, suspended=suspended):
+             raise CuckooPackageError("Unable to execute initial PowerShell process, analysis aborted")
+ 
+         if not free and suspended:
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
+             p.resume()
+             return p.pid
+         else:
+diff -rupN new/analyzer/windows/modules/packages/vbs.py original/analyzer/windows/modules/packages/vbs.py
+--- new/analyzer/windows/modules/packages/vbs.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/vbs.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -33,21 +33,17 @@ class VBS(Package):
+ 
+         dll = self.options.get("dll", None)
+         free = self.options.get("free", False)
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
  
          p = Process()
--        if not p.execute(path=wscript, args="\"{0}\"".format(path), suspended=suspended):
-+        if not p.execute(path=wscript, args="\"{0}\"".format(path), suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path=wscript, args="\"{0}\"".format(path), suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=wscript, args="\"{0}\"".format(path), suspended=suspended):
              raise CuckooPackageError("Unable to execute initial WScript "
                                       "process, analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              return p.pid
          else:
-diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/windows/modules/packages/xls.py
---- original/analyzer/windows/modules/packages/xls.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/xls.py	2014-03-17 14:29:05.096073094 +0100
-@@ -36,17 +36,21 @@ class XLS(Package):
+diff -rupN new/analyzer/windows/modules/packages/xls.py original/analyzer/windows/modules/packages/xls.py
+--- new/analyzer/windows/modules/packages/xls.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/xls.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -36,21 +36,17 @@ class XLS(Package):
  
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
  
          p = Process()
--        if not p.execute(path=excel, args="\"%s\"" % path, suspended=suspended):
-+        if not p.execute(path=excel, args="\"%s\"" % path, suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path=excel, args="\"%s\"" % path, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=excel, args="\"%s\"" % path, suspended=suspended):
              raise CuckooPackageError("Unable to execute initial Microsoft "
                                       "Office Excel process, analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              return p.pid
          else:
-diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/windows/modules/packages/zip.py
---- original/analyzer/windows/modules/packages/zip.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/analyzer/windows/modules/packages/zip.py	2014-03-17 14:29:05.089406427 +0100
-@@ -43,17 +43,21 @@ class Zip(Package):
+diff -rupN new/analyzer/windows/modules/packages/zip.py original/analyzer/windows/modules/packages/zip.py
+--- new/analyzer/windows/modules/packages/zip.py	2014-04-07 16:41:07.980859269 +0200
++++ original/analyzer/windows/modules/packages/zip.py	2014-04-07 13:27:36.000000000 +0200
+@@ -1,4 +1,4 @@
+-# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
+ # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
+ # See the file 'docs/LICENSE' for copying permission.
+ 
+@@ -43,21 +43,17 @@ class Zip(Package):
          dll = self.options.get("dll", None)
          free = self.options.get("free", False)
          args = self.options.get("arguments", None)
-+        kernel_analysis = self.options.get("kernel_analysis", False)
-+        if kernel_analysis != False:
-+            kernel_analysis = True
+-        kernel_analysis = self.options.get("kernel_analysis", False)
+-        if kernel_analysis != False:
+-            kernel_analysis = True
          suspended = True
          if free:
              suspended = False
  
          p = Process()
--        if not p.execute(path=file_path, args=args, suspended=suspended):
-+        if not p.execute(path=file_path, args=args, suspended=suspended, kernel_analysis=kernel_analysis):
+-        if not p.execute(path=file_path, args=args, suspended=suspended, kernel_analysis=kernel_analysis):
++        if not p.execute(path=file_path, args=args, suspended=suspended):
              raise CuckooPackageError("Unable to execute initial process, "
                                       "analysis aborted")
  
          if not free and suspended:
--            p.inject(dll)
-+            if not kernel_analysis:
-+                p.inject(dll)
+-            if not kernel_analysis:
+-                p.inject(dll)
++            p.inject(dll)
              p.resume()
              return p.pid
          else:
-diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
---- original/lib/cuckoo/common/logtbl.py	2014-01-09 15:47:54.000000000 +0100
-+++ new/lib/cuckoo/common/logtbl.py	2014-03-17 14:29:05.756073055 +0100
+diff -rupN new/lib/cuckoo/common/logtbl.py original/lib/cuckoo/common/logtbl.py
+--- new/lib/cuckoo/common/logtbl.py	2014-04-07 16:41:08.084192607 +0200
++++ original/lib/cuckoo/common/logtbl.py	2014-04-07 13:27:36.000000000 +0200
 @@ -1,4 +1,4 @@
--# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
-+	# Copyright (C) 2010-2013 Cuckoo Sandbox Developers.
+-	# Copyright (C) 2010-2013 Cuckoo Sandbox Developers.
++# Copyright (C) 2010-2014 Cuckoo Foundation.
  # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
  # See the file 'docs/LICENSE' for copying permission.
  
-@@ -193,4 +193,47 @@ table = [
+@@ -193,48 +193,4 @@ table = [
      ("ZwMapViewOfSection", "process", ("ppPp", "SectionHandle", "ProcessHandle", "BaseAddress", "SectionOffset")),
      ("GetSystemMetrics", "misc", ("l", "SystemMetricIndex")),
      ("GetCursorPos", "misc", ("ll", "x", "y")),
-+	("REGISTRY_OPEN_KEY", "registry", ("s", "SubKey")),
-+	("REGISTRY_DELETE_KEY", "registry", ("s", "SubKey")),
-+	("REGISTRY_VALUE_KEY_SET", "registry", ("sss", "SubKey", "ValueName", "Data")),
-+	("REGISTRY_VALUE_KEY_DELETE", "registry", ("ss", "SubKey", "ValueName")),
-+	("REGISTRY_KEY_RENAME", "registry", ("ss", "SubKey", "NewName")),
-+	("REGISTRY_ENUMERATE_KEY", "registry", ("s", "SubKey")),
-+	("REGISTRY_ENUMERATE_VALUE_KEY", "registry", ("s", "SubKey")),
-+	("REGISTRY_QUERY_KEY", "registry", ("s", "SubKey")),
-+	("REGISTRY_QUERY_VALUE_KEY", "registry", ("ss", "SubKey", "ValueName")),
-+	("REGISTRY_CREATE_KEY", "registry", ("s", "SubKey")),
-+	("LOAD_DRIVER", "system", ("s", "DriverName")),
-+	("ZwOpenProcess", "process", ("ssss", "ProcessHandle", "ProcessName", "PID", "DesiredAccess")),
-+	("ZwOpenThread", "threading", ("sss", "ThreadHandle", "TID", "DesiredAccess")),
-+	("ZwQuerySystemInformation", "process", ("s", "SystemInformationClass")),
-+	("ZwWriteVirtualMemory", "process", ("sssss", "ProcessHandle", "PID", "BaseAddress", "Buffer", "NumberOfBytesToWrite")),
-+	("ZwDebugActiveProcess", "process", ("sss", "ProcessHandle", "PID", "DebugHandle")),
-+	("ZwCreateProcess", "process", ("ssssss", "ProcessHandle", "PID", "DesiredAccess", "InheritObjectTable", "ParentProcess", "SectionHandle")),
-+	("ZwCreateProcessEx", "process", ("ssssss", "ProcessHandle", "PID", "DesiredAccess", "InheritHandles", "InheritFromProcessHandle", "SectionHandle")),
-+	("ZwQueueApcThread", "threading", ("ssss", "ThreadHandle", "TID", "PID", "ApcRoutine")),
-+	("ZwCreateThread", "threading", ("sssss", "PID", "ThreadHandle", "TID", "CreateSuspended", "DesiredAccess")),
-+	("ZwCreateThreadEx", "threading", ("sssss", "PID", "ThreadHandle", "TID", "CreateSuspended", "DesiredAccess")),
-+	("NtMapViewOfSection", "process", ("sssss", "ProcessHandle", "PID", "BaseAddress", "SectionHandle", "Win32Protect")),
-+	("ZwSetContextThread", "threading", ("sss", "ThreadHandle", "TID", "PID")),
-+	("ZwSystemDebugControl", "process", ("s","Command")),
-+	("ZwCreateFile", "filesystem", ("sssssss", "FileHandle", "FileName", "DesiredAccess", "CreateDisposition", "CreateOptions", "FileAttributes", "ShareAccess")),
-+	("ZwReadFile", "filesystem", ("ssss", "FileHandle",  "FileHandle", "FileName", "Buffer", "Length")),
-+	("ZwWriteFile", "filesystem", ("ssss", "FileHandle", "FileName", "Buffer", "Length")),
-+	("ZwDeleteFile", "filesystem", ("s", "FileName")),
-+	("ZwSetInformationFile (Delete)", "filesystem", ("sss", "FileHandle", "FileName", "FileInformationClass")),
-+	("ZwSetInformationFile (Rename)", "filesystem", ("ssss", "FileHandle", "OriginalName", "Renamed", "FileInformationClass")),
-+	("ZwQueryInformationFile", "filesystem", ("ss", "FileHandle", "FileInformationClass")),
-+	("ZwCreateMutant", "synchronization", ("ssss", "MutantHandle", "DesiredAccess", "MutexName", "InitialOwner")),
-+	("ZwDeviceIoControlFile", "system", ("ss", "FileHandle", "IoControlColde")),
-+	("ZwTerminateProcess", "process", ("sss", "ProcessHandle", "PID", "ExitStatus")),
-+	("ZwDelayExecution", "system", ("s", "DelayInterval")),
-+	("ZwQueryAttributesFile", "filesystem", ("s", "FileName")),
-+	("ZwReadVirtualMemory", "process", ("ssss", "ProcessHandle", "PID", "BaseAddress", "NumberOfBytesToRead")),
-+	("ZwResumeThread", "threading", ("ss", "ThreadHandle", "SuspendCount")),
-+	("ZwCreateSection", "process", ("sss", "SectionHandle", "FileHandle", "FileName")),
-+	("ZwUserCallOneParam", "system", ("ss", "Param", "Routine")),
-+	("ZwUserCallNoParam", "system", ("s", "Routine")),
-+	("ZwLoadDriver", "system", ("s", "DriverName")),
-+	("ZwCreateUserProcess", "process", ("sssssss", "ProcessHandle", "ThreadHandle", "PID", "ProcessDesiredAccess", "ThreadDesiredAccess", "ImagePathName", "CommandLine")),
+-	("REGISTRY_OPEN_KEY", "registry", ("s", "SubKey")),
+-	("REGISTRY_DELETE_KEY", "registry", ("s", "SubKey")),
+-	("REGISTRY_VALUE_KEY_SET", "registry", ("sss", "SubKey", "ValueName", "Data")),
+-	("REGISTRY_VALUE_KEY_DELETE", "registry", ("ss", "SubKey", "ValueName")),
+-	("REGISTRY_KEY_RENAME", "registry", ("ss", "SubKey", "NewName")),
+-	("REGISTRY_ENUMERATE_KEY", "registry", ("s", "SubKey")),
+-	("REGISTRY_ENUMERATE_VALUE_KEY", "registry", ("s", "SubKey")),
+-	("REGISTRY_QUERY_KEY", "registry", ("s", "SubKey")),
+-	("REGISTRY_QUERY_VALUE_KEY", "registry", ("ss", "SubKey", "ValueName")),
+-	("REGISTRY_CREATE_KEY", "registry", ("s", "SubKey")),
+-	("LOAD_DRIVER", "system", ("s", "DriverName")),
+-	("ZwOpenProcess", "process", ("ssss", "ProcessHandle", "ProcessName", "PID", "DesiredAccess")),
+-	("ZwOpenThread", "threading", ("sss", "ThreadHandle", "TID", "DesiredAccess")),
+-	("ZwQuerySystemInformation", "process", ("s", "SystemInformationClass")),
+-	("ZwWriteVirtualMemory", "process", ("sssss", "ProcessHandle", "PID", "BaseAddress", "Buffer", "NumberOfBytesToWrite")),
+-	("ZwDebugActiveProcess", "process", ("sss", "ProcessHandle", "PID", "DebugHandle")),
+-	("ZwCreateProcess", "process", ("ssssss", "ProcessHandle", "PID", "DesiredAccess", "InheritObjectTable", "ParentProcess", "SectionHandle")),
+-	("ZwCreateProcessEx", "process", ("ssssss", "ProcessHandle", "PID", "DesiredAccess", "InheritHandles", "InheritFromProcessHandle", "SectionHandle")),
+-	("ZwQueueApcThread", "threading", ("ssss", "ThreadHandle", "TID", "PID", "ApcRoutine")),
+-	("ZwCreateThread", "threading", ("sssss", "PID", "ThreadHandle", "TID", "CreateSuspended", "DesiredAccess")),
+-	("ZwCreateThreadEx", "threading", ("sssss", "PID", "ThreadHandle", "TID", "CreateSuspended", "DesiredAccess")),
+-	("NtMapViewOfSection", "process", ("sssss", "ProcessHandle", "PID", "BaseAddress", "SectionHandle", "Win32Protect")),
+-	("ZwSetContextThread", "threading", ("sss", "ThreadHandle", "TID", "PID")),
+-	("ZwSystemDebugControl", "process", ("s","Command")),
+-	("ZwCreateFile", "filesystem", ("sssssss", "FileHandle", "FileName", "DesiredAccess", "CreateDisposition", "CreateOptions", "FileAttributes", "ShareAccess")),
+-	("ZwReadFile", "filesystem", ("ssss", "FileHandle",  "FileHandle", "FileName", "Buffer", "Length")),
+-	("ZwWriteFile", "filesystem", ("ssss", "FileHandle", "FileName", "Buffer", "Length")),
+-	("ZwDeleteFile", "filesystem", ("ss", "FileName", "FileToDump")),
+-	("ZwSetInformationFile (Delete)", "filesystem", ("ssss", "FileHandle", "FileName", "FileInformationClass", "FileToDump")),
+-	("ZwSetInformationFile (Rename)", "filesystem", ("ssss", "FileHandle", "OriginalName", "Renamed", "FileInformationClass")),
+-	("ZwQueryInformationFile", "filesystem", ("ss", "FileHandle", "FileInformationClass")),
+-	("ZwCreateMutant", "synchronization", ("ssss", "MutantHandle", "DesiredAccess", "MutexName", "InitialOwner")),
+-	("ZwDeviceIoControlFile", "system", ("ss", "FileHandle", "IoControlColde")),
+-	("ZwTerminateProcess", "process", ("sss", "ProcessHandle", "PID", "ExitStatus")),
+-	("ZwDelayExecution", "system", ("s", "DelayInterval")),
+-	("ZwQueryAttributesFile", "filesystem", ("s", "FileName")),
+-	("ZwReadVirtualMemory", "process", ("ssss", "ProcessHandle", "PID", "BaseAddress", "NumberOfBytesToRead")),
+-	("ZwResumeThread", "threading", ("ss", "ThreadHandle", "SuspendCount")),
+-	("ZwCreateSection", "process", ("sss", "SectionHandle", "FileHandle", "FileName")),
+-	("ZwUserCallOneParam", "system", ("ss", "Param", "Routine")),
+-	("ZwUserCallNoParam", "system", ("s", "Routine")),
+-	("ZwLoadDriver", "system", ("s", "DriverName")),
+-	("ZwCreateUserProcess", "process", ("sssssss", "ProcessHandle", "ThreadHandle", "PID", "ProcessDesiredAccess", "ThreadDesiredAccess", "ImagePathName", "CommandLine")),
+-    ("ZwClose (FILE_DELETE_ON_CLOSE)", "filesystem", ("sss", "FileHandle", "FileName", "FileToDump")),
  ]
-diff -rupN original/modules/processing/behavior.py new/modules/processing/behavior.py
---- original/modules/processing/behavior.py	2014-01-09 15:47:55.000000000 +0100
-+++ new/modules/processing/behavior.py	2014-03-17 14:29:05.556073067 +0100
-@@ -329,6 +329,20 @@ class Summary:
+diff -rupN new/modules/processing/behavior.py original/modules/processing/behavior.py
+--- new/modules/processing/behavior.py	2014-04-07 16:41:08.067525940 +0200
++++ original/modules/processing/behavior.py	2014-04-07 13:27:36.000000000 +0200
+@@ -326,20 +326,6 @@ class Summary:
              name = self._check_registry(registry, subkey, handle)
              if name and name not in self.keys:
                  self.keys.append(name)
-+        
-+        elif call["api"] == ("REGISTRY_OPEN_KEY"):
-+            registry = -1
-+            subkey = ""
-+            handle = 0
-+
-+            for argument in call["arguments"]:
-+                if argument["name"] == "SubKey":
-+                    subkey = argument["value"]
-+
-+            name = self._check_registry(registry, subkey, handle)
-+            if name and name not in self.keys:
-+                self.keys.append(name)
-+
+-        
+-        elif call["api"] == ("REGISTRY_OPEN_KEY"):
+-            registry = -1
+-            subkey = ""
+-            handle = 0
+-
+-            for argument in call["arguments"]:
+-                if argument["name"] == "SubKey":
+-                    subkey = argument["value"]
+-
+-            name = self._check_registry(registry, subkey, handle)
+-            if name and name not in self.keys:
+-                self.keys.append(name)
+-
          elif call["api"].startswith("NtOpenKey"):
              registry = -1
              subkey = ""
-diff -rupN original/web/submission/views.py new/web/submission/views.py
---- original/web/submission/views.py	2014-01-09 15:47:49.000000000 +0100
-+++ new/web/submission/views.py	2014-03-17 14:29:06.839406327 +0100
-@@ -26,6 +26,7 @@ def index(request):
+diff -rupN new/web/submission/views.py original/web/submission/views.py
+--- new/web/submission/views.py	2014-04-07 16:41:08.264192614 +0200
++++ original/web/submission/views.py	2014-04-07 13:27:36.000000000 +0200
+@@ -27,7 +27,6 @@ def index(request):
          package = request.POST.get("package", "")
          timeout = force_int(request.POST.get("timeout"))
          options = request.POST.get("options", "")
-+        analysis = force_int(request.POST.get("analysis"))
+-        analysis = force_int(request.POST.get("analysis"))
          priority = force_int(request.POST.get("priority"))
          machine = request.POST.get("machine", "")
          custom = request.POST.get("custom", "")
-@@ -43,6 +44,11 @@ def index(request):
+@@ -45,11 +44,6 @@ def index(request):
                  options += "&"
              options += "procmemdump=yes"
  
-+        if analysis == 2:
-+            if options:
-+                options += "&"
-+            options += "kernel_analysis=yes"    
-+
-         if "sample" in request.FILES:
-             # Preventive checks.
-             if request.FILES["sample"].size == 0:
-diff -rupN original/web/templates/submission/index.html new/web/templates/submission/index.html
---- original/web/templates/submission/index.html	2014-01-09 15:47:49.000000000 +0100
-+++ new/web/templates/submission/index.html	2014-03-17 14:29:06.626073005 +0100
-@@ -101,6 +101,15 @@ $(document).ready( function() {
+-        if analysis == 2:
+-            if options:
+-                options += "&"
+-            options += "kernel_analysis=yes"    
+-
+         db = Database()
+         task_ids = []
+         task_machines = []
+diff -rupN new/web/templates/submission/index.html original/web/templates/submission/index.html
+--- new/web/templates/submission/index.html	2014-04-07 16:41:08.220859278 +0200
++++ original/web/templates/submission/index.html	2014-04-07 13:27:36.000000000 +0200
+@@ -101,15 +101,6 @@ $(document).ready( function() {
                                  <label for="form_options">Options</label>
                                  <input type="text" class="form-control" id="form_options" name="options" />
                              </div>
-+
-+                            <div class="form-group">
-+                                <label for "form_analysis">Analysis</label>
-+                                <select class="form-control" id="form_analysis" name="analysis">
-+                                    <option value="1">Userland</option>
-+                                    <option value="2">Kernelland</option>
-+                                </select>
-+                            </div>
-+                            
+-
+-                            <div class="form-group">
+-                                <label for "form_analysis">Analysis</label>
+-                                <select class="form-control" id="form_analysis" name="analysis">
+-                                    <option value="1">Userland</option>
+-                                    <option value="2">Kernelland</option>
+-                                </select>
+-                            </div>
+-                            
                              <div class="form-group">
                                  <label for="form_priority">Priority</label>
                                  <select class="form-control" id="form_priority" name="priority">
-@@ -149,4 +158,4 @@ $(document).ready( function() {
+@@ -162,4 +153,4 @@ $(document).ready( function() {
          </form>
      </div>
  </div>
 -{% endblock %}
-\ No newline at end of file
 +{% endblock %}
+\ No newline at end of file
