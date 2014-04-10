@@ -46,7 +46,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 // Uncomment to enable kernel debugging output
-//#define DEBUG
+#define DEBUG
 
 // Memory tags
 #define PROC_POOL_TAG 		'prcT'
@@ -91,9 +91,6 @@ ZWQUERYSYSTEMINFORMATION ZwQuerySystemInformation;
 // GLOBALS 
 /////////////////////////////////////////////////////////////////////////////
 
-// MDL stuff
-PMDL g_pmdlSystemCall;
-PVOID *MappedSystemCallTable;
 
 // registry callback cookie
 LARGE_INTEGER cookie;

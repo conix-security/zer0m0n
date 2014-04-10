@@ -323,8 +323,10 @@ NTSTATUS ioctl_DeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 				#endif DEBUG
 				return STATUS_BUFFER_TOO_SMALL;
 			}
-			
+				
+			#ifdef DEBUG
 			DbgPrint("cuckooPath : %ws\n", cuckooPath);
+			#endif DEBUG
 			
 			Irp->IoStatus.Status = STATUS_SUCCESS;
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);

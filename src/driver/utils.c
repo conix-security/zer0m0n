@@ -101,8 +101,6 @@ ULONG getPIDByHandle(HANDLE hProc)
 //		_out_ PUNICODE_STRING : Caller allocated UNICODE_STRING, process name.
 //	Return value :
 //		NTSTATUS : STATUS_SUCCESS if no error was encountered, otherwise, relevant NTSTATUS code.
-//	TODO : check PAGED_CODE ?
-//	TODO : Zw*
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS getProcNameByPID(ULONG pid, PUNICODE_STRING procName)
 {
@@ -192,9 +190,10 @@ PWCHAR wcsistr(PWCHAR wcs1, PWCHAR wcs2)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Copy the file given as parameter to the cuckoo directory
+//		Move the file given as parameter to the cuckoo directory
 //	Parameters :
-//		_in_ UNICODE_STRING filepath :	.
+//		_in_  UNICODE_STRING filepath : the file to be moved
+//		_out_ PUNICODE_STRING filepath_to_dump : the new pathfile (after the file has been moved)  	
 //	Return value :
 //		STATUS_SUCCESS if the file has correctly been moved, otherwise return error message
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -37,32 +37,6 @@
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
-//		Change MDL Permission in order to hook the SSDT
-//	Parameters :
-//		None
-//	Return value :
-//		None
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-NTSTATUS changeMDLPermission()
-{
-	// Map the memory into our domain so we can change the permissions on the MDL.
-	g_pmdlSystemCall = MmCreateMdl(NULL,
-								KeServiceDescriptorTable.ServiceTableBase,
-								KeServiceDescriptorTable.NumberOfServices * 4);
-    if(!g_pmdlSystemCall)
-		return STATUS_UNSUCCESSFUL;
-	
-	MmBuildMdlForNonPagedPool(g_pmdlSystemCall);
-
-	// Change the flags of the MDL
-	g_pmdlSystemCall->MdlFlags = g_pmdlSystemCall->MdlFlags | MDL_MAPPED_TO_SYSTEM_VA;
-	MappedSystemCallTable = MmMapLockedPages(g_pmdlSystemCall, KernelMode); 
-	
-	return STATUS_SUCCESS;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//	Description :
 //		hook SSDT and Shadow SSDT tables
 //	Parameters :
 //		DWORD pid : python process identifier 
@@ -84,8 +58,6 @@ VOID hook_ssdt(ULONG pid)
 	else
 		return;
 		
-	changeMDLPermission();	
-
 	if(is_xp)
 		hook_ssdt_entries();
 	else
@@ -106,6 +78,8 @@ VOID hook_ssdt(ULONG pid)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID unhook_ssdt_entries()
 {
+	disable_cr0();
+	
 	if(oldNtCreateThread != NULL)
 		(NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX) = oldNtCreateThread;
 		
@@ -198,7 +172,8 @@ VOID unhook_ssdt_entries()
 		
 	if(oldNtClose != NULL)
 		(NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX) = oldNtClose;
-		
+	
+	enable_cr0();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,6 +188,8 @@ VOID unhook_ssdt_entries()
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID unhook_ssdt_entries_7()
 {
+	disable_cr0();
+	
 	if(oldNtCreateThread != NULL)
 		(NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX) = oldNtCreateThread;
 		
@@ -314,6 +291,8 @@ VOID unhook_ssdt_entries_7()
 		
 	if(oldNtClose != NULL)
 		(NTCLOSE)SYSTEMSERVICE(CLOSE_7_INDEX) = oldNtClose;
+	
+	enable_cr0();	
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -328,6 +307,8 @@ VOID unhook_ssdt_entries_7()
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID hook_ssdt_entries()
 {
+	disable_cr0();
+	
 	oldNtCreateThread = (NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX);
 	(NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_INDEX) = newNtCreateThread;
 	
@@ -420,6 +401,8 @@ VOID hook_ssdt_entries()
 	
 	oldNtClose = (NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX);
 	(NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX) = newNtClose;	
+	
+	enable_cr0();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -434,6 +417,8 @@ VOID hook_ssdt_entries()
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 VOID hook_ssdt_entries_7()
 {
+	disable_cr0();
+	
 	oldNtCreateThread = (NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX);
 	(NTCREATETHREAD)SYSTEMSERVICE(CREATETHREAD_7_INDEX) = newNtCreateThread;
 	
@@ -535,6 +520,8 @@ VOID hook_ssdt_entries_7()
 	
 	oldNtClose = (NTCLOSE)SYSTEMSERVICE(CLOSE_7_INDEX);
 	(NTCLOSE)SYSTEMSERVICE(CLOSE_7_INDEX) = newNtClose;
+	
+	enable_cr0();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1863,6 +1850,8 @@ NTSTATUS newNtCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 	{
 		CreateOptions -= FILE_DELETE_ON_CLOSE;
 		DesiredAccess -= DELETE;
+		if(DesiredAccess == 0)
+			DesiredAccess = 1;
 		handle_to_add = TRUE;
 	}
 	
@@ -1929,8 +1918,8 @@ NTSTATUS newNtCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 		if(NT_SUCCESS(statusCall))
 		{
 			// if CreateOptions == FILE_DELETE_ON_CLOSE && DesiredAccess == DELETE), add the handle to the linked list and remove the flags
-			if(handle_to_add)
-				addHandleInMonitoredList(kFileHandle);
+		if(handle_to_add)
+			addHandleInMonitoredList(kFileHandle);
 			
 			log_lvl = LOG_SUCCESS;
 			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssssss,FileHandle->0x%08x,FileName->%wZ,DesiredAccess->0x%08x,CreateDisposition->%d,CreateOptions->%d,FileAttributes->%d,ShareAccess->%d", kFileHandle,&full_path, DesiredAccess, CreateDisposition, CreateOptions, FileAttributes, ShareAccess)))
@@ -2177,7 +2166,7 @@ NTSTATUS newNtDeleteFile(POBJECT_ATTRIBUTES ObjectAttributes)
 		}
 		
 		log_lvl = LOG_SUCCESS;
-		if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,0,ss,FileName->%wZ,FileToDump->%wZ", &kObjectName, &file_to_dump)))
+		if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ss,FileName->%wZ,FileToDump->%wZ", &kObjectName, &file_to_dump)))
 			log_lvl = LOG_PARAM;
 		
 		switch(log_lvl)
@@ -3197,6 +3186,10 @@ ULONG newNtUserCallOneParam(ULONG Param, ULONG Routine)
 	{
 		if(Routine == 0x34)
 		{
+			#ifdef DEBUG
+			DbgPrint("call ZwUserCallOneParam() !\n");
+			#endif
+			
 			parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ss,Param->0x%08x,Routine->0x%08x", Param, Routine)))
 				sendLogs(currentProcessId, L"ZwUserCallOneParam", parameter);
@@ -3270,9 +3263,12 @@ NTSTATUS newNtClose(HANDLE Handle)
 	NTSTATUS status;
 	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
-		if(isProcessMonitoredByPid(currentProcessId) && isHandleInMonitoredList(Handle) && ExGetPreviousMode() != KernelMode)
+	if(isProcessMonitoredByPid(currentProcessId) && isHandleInMonitoredList(Handle) && ExGetPreviousMode() != KernelMode)
 	{
-	
+		#ifdef DEBUG
+		DbgPrint("call ZwClose() !\n");
+		#endif
+		
 		// retrieve filename from handle
 		originalNameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
 		if(originalNameInformation)
@@ -3305,4 +3301,31 @@ NTSTATUS newNtClose(HANDLE Handle)
 	}	
 	else
 		return ((NTCLOSE)(oldNtClose))(Handle);
+}
+
+// disable WP bit of CR0 register : http://en.wikipedia.org/wiki/Control_register#CR0
+void disable_cr0()
+{
+	__asm
+	{
+		push eax
+		mov eax, CR0
+		and eax, 0FFFEFFFFh
+		mov CR0, eax
+		pop eax
+	}
+
+}
+
+// enable WP bit of CR0 register
+void enable_cr0()
+{
+	__asm
+	{
+		push eax
+		mov eax, CR0
+		or eax, NOT 0FFFEFFFFh
+		mov CR0, eax
+		pop eax
+	}
 }

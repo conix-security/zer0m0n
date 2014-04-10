@@ -356,7 +356,7 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 			free(pw_pathfile);
 		}
 
-		// TODO
+		// if the log contains "ZwDeleteFile" as function name, notifies cuckoo that a file has to be dumped
 		if(!strcmp(log.funcname, "ZwDeleteFile") && !log.ret)
 		{
 			us_pathfile = (PUNICODE_STRING)malloc(1024*sizeof(UNICODE_STRING));
