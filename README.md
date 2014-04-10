@@ -11,7 +11,6 @@ To-do :
 
 v0.6 changes :
 + handle files deletion (through NtDeleteFile, NtCreateFile/NtClose via FILE_DELETE_ON_CLOSE and NtSetInformationFile)
-+ using MDL instead of cr0 trick => fix multiprocessor issues
 + cuckoo 1.1 compatibility
 
 v0.5 changes :
