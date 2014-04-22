@@ -77,7 +77,8 @@ void log_raw_direct(const char *buf, size_t length, int g_sock) {
     while (sent < length) {
         r = send(g_sock, buf+sent, length-sent, 0);
         if (r == -1) {
-			fprintf(stderr, "send() error : %d, socket %x\n", WSAGetLastError(),g_sock);
+			//fprintf(stderr, "send() error : %d, socket %x\n", WSAGetLastError(),g_sock);
+			pipe("KERROR: send() error : %d, socket %x\n", WSAGetLastError(),g_sock);
             return;
         }
         sent += r;
@@ -473,6 +474,7 @@ void log_new_thread(DWORD pid, int g_sock)
 int log_init(unsigned int ip, unsigned short port, int debug)
 {
 	int g_sock;
+	int timeout = 0;
 
 	InitializeCriticalSection(&g_mutex);
 
@@ -485,7 +487,7 @@ int log_init(unsigned int ip, unsigned short port, int debug)
         WSAStartup(MAKEWORD(2, 2), &wsa);
 
         g_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
+		setsockopt(g_sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(port);
 		addr.sin_addr.S_un.S_addr = ip;

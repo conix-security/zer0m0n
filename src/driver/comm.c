@@ -94,7 +94,7 @@ NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
 	ULONG sizeBuf;
 	
 	LARGE_INTEGER timeout;
-	timeout.QuadPart = -((LONGLONG)0.1*10*1000*1000);
+	timeout.QuadPart = -((LONGLONG)0.5*10*1000*1000);
 	
 	if(message == NULL)
 		return STATUS_INVALID_PARAMETER;
@@ -150,7 +150,9 @@ NTSTATUS sendLogs(ULONG pid, PWCHAR message, PWCHAR parameter)
 	DbgPrint("\tmsg : %s\n", buf);
 	#endif
     
-    status = FltSendMessage(filter, &clientPort, buf, sizeBuf, NULL, 0, &timeout);
+    status = FltSendMessage(filter, &clientPort, buf, sizeBuf, NULL, 0, NULL);
+	if(status == STATUS_TIMEOUT)
+		DbgPrint("STATUS_TIMEOUT !!\n");
 	KeReleaseMutex(&mutex, FALSE);
 	ExFreePool(processName.Buffer);
 	

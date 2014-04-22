@@ -38,7 +38,7 @@
 #include <string.h>
 #include <fltuser.h>
 
-#define NUMBER_OF_THREADS 64
+#define NUMBER_OF_THREADS 1
 
 typedef struct _UNICODE_STRING {
   USHORT Length;

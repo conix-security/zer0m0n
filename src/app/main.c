@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 	}
 	printf("[+] connected to filter communication port\n");
 
-	context.completion = CreateIoCompletionPort(context.hPort, NULL, 0, 64);
+	context.completion = CreateIoCompletionPort(context.hPort, NULL, 0, NUMBER_OF_THREADS);
 	if(!context.completion)
 	{
 		fprintf(stderr, "error creating completion port : %d\n", GetLastError());
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 	
 	if(WaitForMultipleObjects(NUMBER_OF_THREADS, hThreads, TRUE, INFINITE) == WAIT_FAILED)
 	{
-		fprintf(stderr, "Failed to wait for mutexes\n");
+		fprintf(stderr, "Failed to wait for threads\n");
 		exit(0);
 	}
 	
@@ -132,6 +132,7 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 	ULONG_PTR key;
 	BOOL result;
 	HRESULT hr;
+	int status = 0;
 
 	context = *p;
 	i=0, j=0;
@@ -199,10 +200,15 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 				
 				// create socket / new struct
 				log.g_sock = log_init(g_config.host_ip, g_config.host_port, 0);
+				status = connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr));
+				i=0;
+				if(status)
+				{
+					pipe("KERROR: (%d TRY) Could not connect %d socket : %x ip : %d.%d.%d.%d port : %d (%d given)\n", i, WSAGetLastError(), log.g_sock, addr.sin_addr.S_un.S_un_b.s_b1, addr.sin_addr.S_un.S_un_b.s_b2, addr.sin_addr.S_un.S_un_b.s_b3, addr.sin_addr.S_un.S_un_b.s_b4, ntohs(addr.sin_port), g_config.host_port); 
+					status = connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr));
+					i++;
+				}
 
-				if(connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr)))
-					printf("[!] Could not connect %d\n",WSAGetLastError());
-			
 				announce_netlog(log.pid, log.g_sock);
 				
 				// get process name
