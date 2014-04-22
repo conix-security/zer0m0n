@@ -104,12 +104,12 @@ NTSTATUS regCallback (PVOID CallbackContext, PVOID Argument1, PVOID Argument2)
 					case REG_SZ:
 						tmpCall = RtlStringCchPrintfW(pwBuf, MAXSIZE, L"1,0,sss,SubKey->%wZ,ValueName->%wZ,Data->%ws", tmp, arg->ValueName, ((PWCHAR)arg->Data));
 					break;
-					default :
+					default :					
 						tmp_data = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, 'gnaA');
 						full_data.MaximumLength = MAXSIZE;
 						full_data.Buffer = ExAllocatePoolWithTag(NonPagedPool, full_data.MaximumLength, 'baaH');
 						RtlZeroMemory(full_data.Buffer, full_data.MaximumLength);
-						for(i=0; i<wcslen((PWCHAR)arg->Data); i++)
+						for(i=0; i<arg->DataSize; i++)
 						{
 							if(i==100)
 								break;
@@ -236,7 +236,7 @@ NTSTATUS regCallback (PVOID CallbackContext, PVOID Argument1, PVOID Argument2)
 				sendLogs(pid, L"REGISTRY_QUERY_VALUE_KEY", L"1,0,ss,SubKey->ERROR,ValueName->ERROR");
 		break;
 		
-		case RegNtPreCreateKeyEx:
+		case RegNtPreCreateKey:
 			#ifdef DEBUG
 			DbgPrint("call CreateKey() !\n");
 			#endif
@@ -245,7 +245,39 @@ NTSTATUS regCallback (PVOID CallbackContext, PVOID Argument1, PVOID Argument2)
 			else
 				sendLogs(pid, L"REGISTRY_CREATE_KEY", L"1,0,s,SubKey->ERROR");
 		break;
-	
+		
+		case RegNtPreCreateKeyEx:
+			#ifdef DEBUG
+			DbgPrint("call CreateKeyEx() !\n");
+			#endif
+			if(NT_SUCCESS(RtlStringCchPrintfW(pwBuf, MAXSIZE, L"1,0,s,SubKey->%wZ", ((PREG_PRE_CREATE_KEY_INFORMATION)Argument2)->CompleteName)))
+				sendLogs(pid,L"REGISTRY_CREATE_KEY", pwBuf);
+			else
+				sendLogs(pid, L"REGISTRY_CREATE_KEY", L"1,0,s,SubKey->ERROR");
+		break;
+		
+		case RegNtPreOpenKey:
+			#ifdef DEBUG
+			DbgPrint("call OpenKey() !\n");
+			#endif
+			
+			if(((PREG_OPEN_KEY_INFORMATION)Argument2)->CompleteName->Buffer != NULL)
+			{
+				if(!_wcsicmp(((PREG_OPEN_KEY_INFORMATION)Argument2)->CompleteName->Buffer, L"SOFTWARE\\Oracle\\VirtualBox Guest Additions") || !_wcsicmp(((PREG_OPEN_KEY_INFORMATION)Argument2)->CompleteName->Buffer, L"SOFTWARE\\VMware, Inc.\\VMware Tools"))
+				{
+					if(NT_SUCCESS(RtlStringCchPrintfW(pwBuf, MAXSIZE, L"0,0,s,SubKey->%wZ", ((PREG_OPEN_KEY_INFORMATION)Argument2)->CompleteName)))
+						sendLogs(pid,L"REGISTRY_OPEN_KEY", pwBuf);
+					return STATUS_OBJECT_NAME_NOT_FOUND;
+				}
+				if(NT_SUCCESS(RtlStringCchPrintfW(pwBuf, MAXSIZE, L"1,0,s,SubKey->%wZ", ((PREG_OPEN_KEY_INFORMATION)Argument2)->CompleteName)))
+					sendLogs(pid,L"REGISTRY_OPEN_KEY", pwBuf);
+				else
+					sendLogs(pid, L"REGISTRY_OPEN_KEY", L"1,0,s,SubKey->ERROR");	
+			}
+			else
+				sendLogs(pid, L"REGISTRY_OPEN_KEY", L"1,0,s,SubKey->ERROR");
+		break;
+		
 		case RegNtPreOpenKeyEx:
 			#ifdef DEBUG
 			DbgPrint("call OpenKeyEx() !\n");
