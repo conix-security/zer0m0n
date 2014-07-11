@@ -80,7 +80,7 @@ To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo 
 
     - copy "cuckoo.patch" to your cuckoo root directory
   
-    - run "patch -R -p1 < ./cuckoo.patch"
+    - run "patch -p1 < ./cuckoo.patch"
   
     - copy the "logs_dispatcher.exe" and "zer0m0n.sys" files into your /cuckoo/analyzer/windows/dll/ folder
    
