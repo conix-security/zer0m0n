@@ -113,7 +113,7 @@ To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo 
 
  3- Run "disable_patchguard.bat" as administrator
 
- 4- Disable UAC by ....  and restart the virtual machine
+ 4- Disable UAC (http://windows.microsoft.com/en-us/windows/turn-user-account-control-on-off#1TC=windows-7)  and restart the virtual machine
 
  5- At boot time, press F8 (to access the Advanced Boot Options) and choose "Disable Driver Signature Enforcement"  
  
