@@ -5,7 +5,6 @@ To-do :
 + Eliminate bugs :]
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
 + Add monitored functions/events
-+ x64 support (get rid of SSDT hooks)
 + fix random socket desynch
 + etc.
 
