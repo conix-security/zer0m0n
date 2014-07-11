@@ -78,6 +78,7 @@
 #define USERCALLONEPARAM_INDEX 0x143
 #define LOADDRIVER_INDEX 0x61
 #define CLOSE_INDEX 0x19
+#define OPENFILE_INDEX 0x74
 
 // Syscalls numbers (7)
 #define CREATETHREAD_7_INDEX 0x57
@@ -112,6 +113,7 @@
 #define USERCALLNOPARAM_7_INDEX 0x14d 
 #define LOADDRIVER_7_INDEX 0x9B
 #define CLOSE_7_INDEX 0x32
+#define OPENFILE_7_INDEX 0xB3
 
 typedef struct _ServiceDescriptorEntry {
      unsigned int *ServiceTableBase;
@@ -272,6 +274,7 @@ typedef NTSTATUS(*NTRESUMETHREAD)(HANDLE, PULONG);
 typedef NTSTATUS(*NTCREATESECTION)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PLARGE_INTEGER, ULONG, ULONG, HANDLE);
 typedef NTSTATUS(*NTLOADDRIVER)(PUNICODE_STRING);
 typedef NTSTATUS(*NTCLOSE)(HANDLE);
+typedef NTSTATUS(*NTOPENFILE)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PIO_STATUS_BLOCK, ULONG, ULONG);
 
 // shadow ssdt
 typedef ULONG(*NTUSERCALLONEPARAM)(ULONG, ULONG);
@@ -315,6 +318,7 @@ NTUSERCALLONEPARAM oldNtUserCallOneParam;
 NTUSERCALLNOPARAM oldNtUserCallNoParam;
 NTLOADDRIVER oldNtLoadDriver;
 NTCLOSE oldNtClose;
+NTOPENFILE oldNtOpenFile;
 
 // SSDT import
 __declspec(dllimport) ServiceDescriptorTableEntry KeServiceDescriptorTable;
@@ -529,6 +533,16 @@ NTSTATUS newNtDebugActiveProcess(HANDLE ProcessHandle, HANDLE DebugHandle);
 //		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566424(v=vs.85).aspx
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NTSTATUS newNtCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PIO_STATUS_BLOCK IoStatusBlock, PLARGE_INTEGER AllocationSize, ULONG FileAttributes, ULONG ShareAccess, ULONG CreateDisposition, ULONG CreateOptions, PVOID EaBuffer, ULONG EaLength);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
+//		Logs file opening.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/bb432381(v=vs.85).aspx
+//  Return value :
+//		See http://msdn.microsoft.com/en-us/library/bb432381(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtOpenFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PIO_STATUS_BLOCK IoStatusBlock, ULONG ShareAccess, ULONG OpenOptions);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
