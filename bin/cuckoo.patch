@@ -1,6 +1,6 @@
 diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.py
---- original/analyzer/windows/analyzer.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/analyzer.py	2014-04-22 17:28:46.787402040 +0200
+--- original/analyzer/windows/analyzer.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/analyzer.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -49,7 +49,7 @@ diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.p
 +                            filename = os.path.basename(filepath)
 +
 +                            if not protected_filename(filename):
-+                                add_pids(process_id)
++                                add_pid(process_id)
 +                                log.info("Announce process name : %s", filename)
 +                PROCESS_LOCK.release()                
 +            
@@ -126,9 +126,9 @@ diff -rupN original/analyzer/windows/analyzer.py new/analyzer/windows/analyzer.p
          self.complete()
  
 diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib/api/process.py
---- original/analyzer/windows/lib/api/process.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/lib/api/process.py	2014-04-22 17:28:46.790735400 +0200
-@@ -1,18 +1,20 @@
+--- original/analyzer/windows/lib/api/process.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/lib/api/process.py	2014-07-11 18:20:41.987160878 +0200
+@@ -1,18 +1,22 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
  # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
@@ -139,8 +139,11 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
  import random
 +import win32file
 +import win32api
++import platform
++
  from time import time
- from ctypes import byref, c_ulong, create_string_buffer, c_int, sizeof
+-from ctypes import byref, c_ulong, create_string_buffer, c_int, sizeof
++from ctypes import byref, c_ulong, create_string_buffer, c_int, sizeof 
  from shutil import copy
  
  from lib.common.constants import PIPE, PATHS
@@ -152,7 +155,7 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
  from lib.common.defines import CREATE_NEW_CONSOLE, CREATE_SUSPENDED
  from lib.common.defines import MEM_RESERVE, MEM_COMMIT, PAGE_READWRITE
  from lib.common.defines import MEMORY_BASIC_INFORMATION
-@@ -21,6 +23,10 @@ from lib.common.rand import random_strin
+@@ -21,8 +25,15 @@ from lib.common.rand import random_strin
  from lib.common.results import NetlogFile
  from lib.core.config import Config
  
@@ -162,8 +165,13 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
 +
  log = logging.getLogger(__name__)
  
++def is_os_64bit():
++    return platform.machine().endswith('64')
++
  def randomize_dll(dll_path):
-@@ -174,7 +180,7 @@ class Process:
+     """Randomize DLL name.
+     @return: new DLL path.
+@@ -174,7 +185,7 @@ class Process:
  
          return None
  
@@ -172,16 +180,18 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
          """Execute sample process.
          @param path: sample path.
          @param args: process args.
-@@ -218,6 +224,100 @@ class Process:
+@@ -218,6 +229,105 @@ class Process:
              self.h_thread = process_info.hThread
              log.info("Successfully executed process from path \"%s\" with "
                       "arguments \"%s\" with pid %d", path, args, self.pid)
 +	    
-+            """ send pid to kernel driver """
 +            if kernel_analysis == True:
 +                log.info("Starting kernel analysis")
 +                log.info("Installing driver")
-+                sys_file = os.path.join(os.getcwd(), "dll", "zer0m0n.sys")
++                if is_os_64bit(): 
++                    sys_file = os.path.join(os.getcwd(), "dll", "zer0m0n_x64.sys")
++                else:
++                    sys_file = os.path.join(os.getcwd(), "dll", "zer0m0n.sys")
 +                exe_file = os.path.join(os.getcwd(), "dll", "logs_dispatcher.exe")
 +                if not sys_file or not exe_file or not os.path.exists(sys_file) or not os.path.exists(exe_file):
 +                        log.warning("No valid zer0m0n files to be used for process with pid %d, injection aborted", self.pid)
@@ -205,8 +215,12 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
 +                fh = open(new_inf,"w")
 +                fh.write(inf_data)
 +                fh.close()
++            
++                if is_os_64bit():
++                    wow64 = c_ulong(0)
++                    KERNEL32.Wow64DisableWow64FsRedirection(byref(wow64))
 +                
-+                os.system("rundll32 setupapi.dll, InstallHinfSection DefaultInstall 132 "+new_inf)
++                os.system('cmd /c "rundll32 setupapi.dll, InstallHinfSection DefaultInstall 132 '+new_inf+'"')
 +                os.system("net start "+service_name)
 +                
 +                si = STARTUPINFO()
@@ -214,7 +228,6 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
 +                pi = PROCESS_INFORMATION()
 +                cr = CREATE_NEW_CONSOLE 
 +                
-+                log.info("Starting "+exe_name+".exe")
 +                ldp = KERNEL32.CreateProcessA(new_exe,
 +                                              None,
 +                                              None,
@@ -273,7 +286,7 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
              return True
          else:
              log.error("Failed to execute process from path \"%s\" with "
-@@ -316,9 +416,9 @@ class Process:
+@@ -316,9 +426,9 @@ class Process:
  
              # The first time we come up with a random startup-time.
              if Process.first_process:
@@ -286,7 +299,7 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
                  Process.startup_time = random.randint(1, 30) * 20 * 60 * 1000
  
              config.write("host-ip={0}\n".format(cfg.ip))
-@@ -372,7 +472,7 @@ class Process:
+@@ -372,7 +482,7 @@ class Process:
                  return False
              else:
                  KERNEL32.CloseHandle(thread_handle)
@@ -296,8 +309,8 @@ diff -rupN original/analyzer/windows/lib/api/process.py new/analyzer/windows/lib
  
      def wait(self):
 diff -rupN original/analyzer/windows/lib/common/defines.py new/analyzer/windows/lib/common/defines.py
---- original/analyzer/windows/lib/common/defines.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/lib/common/defines.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/lib/common/defines.py	2014-07-11 18:20:44.777160985 +0200
++++ new/analyzer/windows/lib/common/defines.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -335,8 +348,8 @@ diff -rupN original/analyzer/windows/lib/common/defines.py new/analyzer/windows/
      _fields_ = [
          ("LowPart", DWORD),
 diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/windows/modules/packages/applet.py
---- original/analyzer/windows/modules/packages/applet.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/applet.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/applet.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/applet.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -369,8 +382,8 @@ diff -rupN original/analyzer/windows/modules/packages/applet.py new/analyzer/win
              p.resume()
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/windows/modules/packages/bin.py
---- original/analyzer/windows/modules/packages/bin.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/bin.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/bin.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/bin.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -393,8 +406,8 @@ diff -rupN original/analyzer/windows/modules/packages/bin.py new/analyzer/window
  
          return p.pid
 diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/windows/modules/packages/cpl.py
---- original/analyzer/windows/modules/packages/cpl.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/cpl.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/cpl.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/cpl.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -427,8 +440,8 @@ diff -rupN original/analyzer/windows/modules/packages/cpl.py new/analyzer/window
              return p.pid
          else:
 diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/windows/modules/packages/dll.py
---- original/analyzer/windows/modules/packages/dll.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/dll.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/dll.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/dll.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -462,8 +475,8 @@ diff -rupN original/analyzer/windows/modules/packages/dll.py new/analyzer/window
              return p.pid
          else:
 diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/windows/modules/packages/doc.py
---- original/analyzer/windows/modules/packages/doc.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/doc.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/doc.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/doc.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -496,8 +509,8 @@ diff -rupN original/analyzer/windows/modules/packages/doc.py new/analyzer/window
              return p.pid
          else:
 diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/windows/modules/packages/exe.py
---- original/analyzer/windows/modules/packages/exe.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/exe.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/exe.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/exe.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -529,8 +542,8 @@ diff -rupN original/analyzer/windows/modules/packages/exe.py new/analyzer/window
              p.close()
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/windows/modules/packages/generic.py
---- original/analyzer/windows/modules/packages/generic.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/generic.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/generic.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/generic.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -564,8 +577,8 @@ diff -rupN original/analyzer/windows/modules/packages/generic.py new/analyzer/wi
              p.close()
              return p.pid
 diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windows/modules/packages/html.py
---- original/analyzer/windows/modules/packages/html.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/html.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/html.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/html.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -599,8 +612,8 @@ diff -rupN original/analyzer/windows/modules/packages/html.py new/analyzer/windo
              return p.pid
          else:
 diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows/modules/packages/ie.py
---- original/analyzer/windows/modules/packages/ie.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/ie.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/ie.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/ie.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -634,8 +647,8 @@ diff -rupN original/analyzer/windows/modules/packages/ie.py new/analyzer/windows
              return p.pid
          else:
 diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/windows/modules/packages/jar.py
---- original/analyzer/windows/modules/packages/jar.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/jar.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/jar.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/jar.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -669,8 +682,8 @@ diff -rupN original/analyzer/windows/modules/packages/jar.py new/analyzer/window
              return p.pid
          else:
 diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/windows/modules/packages/pdf.py
---- original/analyzer/windows/modules/packages/pdf.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/pdf.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/pdf.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/pdf.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -702,8 +715,8 @@ diff -rupN original/analyzer/windows/modules/packages/pdf.py new/analyzer/window
              return p.pid
          else:
 diff -rupN original/analyzer/windows/modules/packages/ps1.py new/analyzer/windows/modules/packages/ps1.py
---- original/analyzer/windows/modules/packages/ps1.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/ps1.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/ps1.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/ps1.py	2014-07-11 18:20:41.987160878 +0200
 @@ -33,6 +33,10 @@ class PS1(Package):
  
          dll = self.options.get("dll", None)
@@ -731,8 +744,8 @@ diff -rupN original/analyzer/windows/modules/packages/ps1.py new/analyzer/window
              return p.pid
          else:
 diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/windows/modules/packages/vbs.py
---- original/analyzer/windows/modules/packages/vbs.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/vbs.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/vbs.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/vbs.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -764,8 +777,8 @@ diff -rupN original/analyzer/windows/modules/packages/vbs.py new/analyzer/window
              return p.pid
          else:
 diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/windows/modules/packages/xls.py
---- original/analyzer/windows/modules/packages/xls.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/xls.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/xls.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/xls.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -797,8 +810,8 @@ diff -rupN original/analyzer/windows/modules/packages/xls.py new/analyzer/window
              return p.pid
          else:
 diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/windows/modules/packages/zip.py
---- original/analyzer/windows/modules/packages/zip.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/analyzer/windows/modules/packages/zip.py	2014-04-22 17:28:46.790735400 +0200
+--- original/analyzer/windows/modules/packages/zip.py	2014-07-11 18:20:44.773827653 +0200
++++ new/analyzer/windows/modules/packages/zip.py	2014-07-11 18:20:41.987160878 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +# Copyright (C) 2010-2014 Cuckoo Sandbox Developers.
@@ -829,16 +842,255 @@ diff -rupN original/analyzer/windows/modules/packages/zip.py new/analyzer/window
              p.resume()
              return p.pid
          else:
+diff -rupN original/lib/cuckoo/common/logtbl.c new/lib/cuckoo/common/logtbl.c
+--- original/lib/cuckoo/common/logtbl.c	1970-01-01 01:00:00.000000000 +0100
++++ new/lib/cuckoo/common/logtbl.c	2014-07-11 18:20:41.983827545 +0200
+@@ -0,0 +1,235 @@
++#include <stdio.h>
++
++const char *logtbl[] = {
++    "__process__",
++    "__thread__",
++    "NtDeleteFile",
++    "CreateDirectoryW",
++    "CreateDirectoryExW",
++    "RemoveDirectoryA",
++    "RemoveDirectoryW",
++    "FindFirstFileExA",
++    "FindFirstFileExW",
++    "DeleteFileA",
++    "DeleteFileW",
++    "UnhookWindowsHookEx",
++    "LdrGetDllHandle",
++    "ExitWindowsEx",
++    "IsDebuggerPresent",
++    "LookupPrivilegeValueW",
++    "NtClose",
++    "URLDownloadToFileW",
++    "InternetReadFile",
++    "InternetWriteFile",
++    "InternetCloseHandle",
++    "DnsQuery_A",
++    "DnsQuery_UTF8",
++    "DnsQuery_W",
++    "getaddrinfo",
++    "GetAddrInfoW",
++    "NtTerminateProcess",
++    "ExitProcess",
++    "system",
++    "RegOpenKeyExA",
++    "RegOpenKeyExW",
++    "RegDeleteKeyA",
++    "RegDeleteKeyW",
++    "RegEnumKeyW",
++    "RegDeleteValueA",
++    "RegDeleteValueW",
++    "RegCloseKey",
++    "NtRenameKey",
++    "NtEnumerateKey",
++    "NtDeleteKey",
++    "NtDeleteValueKey",
++    "NtLoadKey",
++    "NtSaveKey",
++    "ControlService",
++    "DeleteService",
++    "NtDelayExecution",
++    "NtDelayExecution",
++    "WSAStartup",
++    "gethostbyname",
++    "socket",
++    "connect",
++    "send",
++    "sendto",
++    "recv",
++    "recvfrom",
++    "accept",
++    "bind",
++    "bind",
++    "setsockopt",
++    "listen",
++    "select",
++    "ioctlsocket",
++    "closesocket",
++    "shutdown",
++    "WSARecv",
++    "WSARecvFrom",
++    "WSASend",
++    "WSASendTo",
++    "WSASocketA",
++    "WSASocketW",
++    "ConnectEx",
++    "NtOpenMutant",
++    "NtGetContextThread",
++    "NtSetContextThread",
++    "NtResumeThread",
++    "NtTerminateThread",
++    "ExitThread",
++    "FindWindowA",
++    "FindWindowW",
++    "FindWindowExA",
++    "FindWindowExA",
++    "FindWindowExW",
++    "FindWindowExW",
++    "NtCreateFile",
++    "NtOpenFile",
++    "NtReadFile",
++    "NtWriteFile",
++    "NtDeviceIoControlFile",
++    "NtQueryDirectoryFile",
++    "NtQueryInformationFile",
++    "NtSetInformationFile",
++    "NtOpenDirectoryObject",
++    "NtCreateDirectoryObject",
++    "MoveFileWithProgressW",
++    "CopyFileA",
++    "CopyFileW",
++    "CopyFileExW",
++    "SetWindowsHookExA",
++    "SetWindowsHookExW",
++    "LdrLoadDll",
++    "LdrGetProcedureAddress",
++    "DeviceIoControl",
++    "WriteConsoleA",
++    "WriteConsoleW",
++    "InternetOpenA",
++    "InternetOpenW",
++    "InternetConnectA",
++    "InternetConnectW",
++    "InternetOpenUrlA",
++    "InternetOpenUrlW",
++    "HttpOpenRequestA",
++    "HttpOpenRequestW",
++    "HttpSendRequestA",
++    "HttpSendRequestW",
++    "NtCreateProcess",
++    "NtCreateProcessEx",
++    "NtCreateUserProcess",
++    "NtOpenProcess",
++    "NtOpenProcess",
++    "NtCreateSection",
++    "NtOpenSection",
++    "CreateProcessInternalW",
++    "ShellExecuteExW",
++    "NtAllocateVirtualMemory",
++    "NtReadVirtualMemory",
++    "ReadProcessMemory",
++    "NtWriteVirtualMemory",
++    "WriteProcessMemory",
++    "NtProtectVirtualMemory",
++    "VirtualProtectEx",
++    "NtFreeVirtualMemory",
++    "VirtualFreeEx",
++    "RegCreateKeyExA",
++    "RegCreateKeyExW",
++    "RegEnumKeyExA",
++    "RegEnumKeyExW",
++    "RegEnumValueA",
++    "RegEnumValueA",
++    "RegEnumValueW",
++    "RegEnumValueW",
++    "RegSetValueExA",
++    "RegSetValueExA",
++    "RegSetValueExW",
++    "RegSetValueExW",
++    "RegQueryValueExA",
++    "RegQueryValueExA",
++    "RegQueryValueExW",
++    "RegQueryValueExW",
++    "RegQueryInfoKeyA",
++    "RegQueryInfoKeyW",
++    "NtCreateKey",
++    "NtOpenKey",
++    "NtOpenKeyEx",
++    "NtReplaceKey",
++    "NtEnumerateValueKey",
++    "NtSetValueKey",
++    "NtSetValueKey",
++    "NtQueryValueKey",
++    "NtQueryValueKey",
++    "NtQueryMultipleValueKey",
++    "NtLoadKey2",
++    "NtLoadKeyEx",
++    "NtQueryKey",
++    "NtSaveKeyEx",
++    "OpenSCManagerA",
++    "OpenSCManagerW",
++    "CreateServiceA",
++    "CreateServiceW",
++    "OpenServiceA",
++    "OpenServiceW",
++    "StartServiceA",
++    "StartServiceW",
++    "TransmitFile",
++    "NtCreateMutant",
++    "NtCreateNamedPipeFile",
++    "NtCreateThread",
++    "NtOpenThread",
++    "NtSuspendThread",
++    "CreateThread",
++    "CreateRemoteThread",
++    "RtlCreateUserThread",
++    "ZwMapViewOfSection",
++    "GetSystemMetrics",
++    "GetCursorPos",
++    "REGISTRY_OPEN_KEY",
++    "REGISTRY_DELETE_KEY",
++    "REGISTRY_VALUE_KEY_SET",
++    "REGISTRY_VALUE_KEY_DELETE",
++    "REGISTRY_KEY_RENAME",
++    "REGISTRY_ENUMERATE_KEY",
++    "REGISTRY_ENUMERATE_VALUE_KEY",
++    "REGISTRY_QUERY_KEY",
++    "REGISTRY_QUERY_VALUE_KEY",
++    "REGISTRY_CREATE_KEY",
++    "LOAD_DRIVER",
++    "ZwOpenProcess",
++    "ZwOpenThread",
++    "ZwQuerySystemInformation",
++    "ZwWriteVirtualMemory",
++    "ZwDebugActiveProcess",
++    "ZwCreateProcess",
++    "ZwCreateProcessEx",
++    "ZwQueueApcThread",
++    "ZwCreateThread",
++    "ZwCreateThreadEx",
++    "NtMapViewOfSection",
++    "ZwSetContextThread",
++    "ZwSystemDebugControl",
++    "ZwCreateFile",
++    "ZwOpenFile",
++    "ZwReadFile",
++    "ZwWriteFile",
++    "ZwDeleteFile",
++    "ZwClose (FILE_DELETE_ON_CLOSE)",
++    "ZwSetInformationFile (Delete)",
++    "ZwSetInformationFile (Rename)",
++    "ZwQueryInformationFile",
++    "ZwCreateMutant",
++    "ZwDeviceIoControlFile",
++    "ZwTerminateProcess",
++    "ZwDelayExecution",
++    "ZwQueryAttributesFile",
++    "ZwReadVirtualMemory",
++    "ZwResumeThread",
++    "ZwCreateSection",
++    "ZwUserCallOneParam",
++    "ZwUserCallNoParam",
++    "ZwLoadDriver",
++    "ZwCreateUserProcess",
++    NULL
++};
++char logtbl_explained[sizeof(logtbl)/sizeof(char *)] = {0};
 diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
---- original/lib/cuckoo/common/logtbl.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/lib/cuckoo/common/logtbl.py	2014-04-22 17:28:46.797402293 +0200
+--- original/lib/cuckoo/common/logtbl.py	2014-07-11 18:20:44.777160985 +0200
++++ new/lib/cuckoo/common/logtbl.py	2014-07-11 18:20:41.983827545 +0200
 @@ -1,4 +1,4 @@
 -# Copyright (C) 2010-2014 Cuckoo Foundation.
 +	# Copyright (C) 2010-2013 Cuckoo Sandbox Developers.
  # This file is part of Cuckoo Sandbox - http://www.cuckoosandbox.org
  # See the file 'docs/LICENSE' for copying permission.
  
-@@ -193,4 +193,48 @@ table = [
+@@ -193,4 +193,50 @@ table = [
      ("ZwMapViewOfSection", "process", ("ppPp", "SectionHandle", "ProcessHandle", "BaseAddress", "SectionOffset")),
      ("GetSystemMetrics", "misc", ("l", "SystemMetricIndex")),
      ("GetCursorPos", "misc", ("ll", "x", "y")),
@@ -866,11 +1118,14 @@ diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
 +	("NtMapViewOfSection", "process", ("sssss", "ProcessHandle", "PID", "BaseAddress", "SectionHandle", "Win32Protect")),
 +	("ZwSetContextThread", "threading", ("sss", "ThreadHandle", "TID", "PID")),
 +	("ZwSystemDebugControl", "process", ("s","Command")),
-+	("ZwCreateFile", "filesystem", ("sssssss", "FileHandle", "FileName", "DesiredAccess", "CreateDisposition", "CreateOptions", "FileAttributes", "ShareAccess")),
++	("ZwCreateFile", "filesystem", ("ssssssss", "FileHandle", "FileName", "DesiredAccess", "CreateDisposition", "CreateOptions", "FileAttributes",
++        "ShareAccess", "Status")),
++	("ZwOpenFile", "filesystem", ("sssss", "FileHandle", "FileName", "DesiredAccess", "ShareAccess", "OpenOptions")),
 +	("ZwReadFile", "filesystem", ("ssss", "FileHandle",  "FileHandle", "FileName", "Buffer", "Length")),
 +	("ZwWriteFile", "filesystem", ("ssss", "FileHandle", "FileName", "Buffer", "Length")),
-+	("ZwDeleteFile", "filesystem", ("ss", "FileName", "FileToDump")),
-+	("ZwSetInformationFile (Delete)", "filesystem", ("ssss", "FileHandle", "FileName", "FileInformationClass", "FileToDump")),
++	("ZwDeleteFile", "filesystem", ("s", "FileName")),
++	("ZwClose (FILE_DELETE_ON_CLOSE)", "filesystem", ("sss", "FileHandle", "FileName", "FileToDump")),
++	("ZwSetInformationFile (Delete)", "filesystem", ("sss", "FileHandle", "FileName", "FileInformationClass")),
 +	("ZwSetInformationFile (Rename)", "filesystem", ("ssss", "FileHandle", "OriginalName", "Renamed", "FileInformationClass")),
 +	("ZwQueryInformationFile", "filesystem", ("ss", "FileHandle", "FileInformationClass")),
 +	("ZwCreateMutant", "synchronization", ("ssss", "MutantHandle", "DesiredAccess", "MutexName", "InitialOwner")),
@@ -885,11 +1140,10 @@ diff -rupN original/lib/cuckoo/common/logtbl.py new/lib/cuckoo/common/logtbl.py
 +	("ZwUserCallNoParam", "system", ("s", "Routine")),
 +	("ZwLoadDriver", "system", ("s", "DriverName")),
 +	("ZwCreateUserProcess", "process", ("sssssss", "ProcessHandle", "ThreadHandle", "PID", "ProcessDesiredAccess", "ThreadDesiredAccess", "ImagePathName", "CommandLine")),
-+    ("ZwClose (FILE_DELETE_ON_CLOSE)", "filesystem", ("sss", "FileHandle", "FileName", "FileToDump")),
  ]
 diff -rupN original/lib/cuckoo/core/startup.py new/lib/cuckoo/core/startup.py
---- original/lib/cuckoo/core/startup.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/lib/cuckoo/core/startup.py	2014-04-22 17:28:46.797402293 +0200
+--- original/lib/cuckoo/core/startup.py	2014-07-11 18:20:44.777160985 +0200
++++ new/lib/cuckoo/core/startup.py	2014-07-11 18:20:41.983827545 +0200
 @@ -87,7 +87,7 @@ def check_version():
          return
  
@@ -909,8 +1163,8 @@ diff -rupN original/lib/cuckoo/core/startup.py new/lib/cuckoo/core/startup.py
  class DatabaseHandler(logging.Handler):
      """Logging to database handler."""
 diff -rupN original/modules/processing/behavior.py new/modules/processing/behavior.py
---- original/modules/processing/behavior.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/modules/processing/behavior.py	2014-04-22 17:28:46.797402293 +0200
+--- original/modules/processing/behavior.py	2014-07-11 18:20:44.767160985 +0200
++++ new/modules/processing/behavior.py	2014-07-11 18:20:41.987160878 +0200
 @@ -326,6 +326,20 @@ class Summary:
              name = self._check_registry(registry, subkey, handle)
              if name and name not in self.keys:
@@ -933,8 +1187,8 @@ diff -rupN original/modules/processing/behavior.py new/modules/processing/behavi
              registry = -1
              subkey = ""
 diff -rupN original/utils/clean.sh new/utils/clean.sh
---- original/utils/clean.sh	2014-04-07 13:27:36.000000000 +0200
-+++ new/utils/clean.sh	2014-04-22 17:28:46.800735645 +0200
+--- original/utils/clean.sh	2014-07-11 18:20:44.773827653 +0200
++++ new/utils/clean.sh	2014-07-11 18:20:41.980494212 +0200
 @@ -10,5 +10,6 @@ if [[ $PWD/ = */utils/ ]]; then
      export PWD=${PWD:0:${#PWD}-6}
  fi
@@ -943,8 +1197,8 @@ diff -rupN original/utils/clean.sh new/utils/clean.sh
  rm -rf $PWD/db/ $PWD/log/ $PWD/storage/
  find $PWD/ -name '*.pyc' -exec rm {} \;
 diff -rupN original/web/submission/views.py new/web/submission/views.py
---- original/web/submission/views.py	2014-04-07 13:27:36.000000000 +0200
-+++ new/web/submission/views.py	2014-04-22 17:28:46.924068864 +0200
+--- original/web/submission/views.py	2014-07-11 18:20:44.777160985 +0200
++++ new/web/submission/views.py	2014-07-11 18:20:41.977160880 +0200
 @@ -27,6 +27,7 @@ def index(request):
          package = request.POST.get("package", "")
          timeout = force_int(request.POST.get("timeout"))
@@ -966,8 +1220,8 @@ diff -rupN original/web/submission/views.py new/web/submission/views.py
          task_ids = []
          task_machines = []
 diff -rupN original/web/templates/submission/index.html new/web/templates/submission/index.html
---- original/web/templates/submission/index.html	2014-04-07 13:27:36.000000000 +0200
-+++ new/web/templates/submission/index.html	2014-04-22 17:28:46.857402200 +0200
+--- original/web/templates/submission/index.html	2014-07-11 18:20:44.777160985 +0200
++++ new/web/templates/submission/index.html	2014-07-11 18:20:41.980494212 +0200
 @@ -101,6 +101,15 @@ $(document).ready( function() {
                                  <label for="form_options">Options</label>
                                  <input type="text" class="form-control" id="form_options" name="options" />
