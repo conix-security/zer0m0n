@@ -1,12 +1,15 @@
-zer0m0n v0.6
+zer0m0n v0.7
 ============
 
 zer0m0n is a driver for Cuckoo Sandbox, it will perform kernel analysis during the execution of a malware. There are many ways for a malware author to bypass Cuckoo detection, he can detect the hooks, hardcodes the Nt* functions to avoid the hooks, detect the virtual machine... The goal of this driver is to offer the possibility for the user to choose between the classical userland analysis or a kernel analysis, which will be harder to detect or bypass.
 
-Actually, it only works for XP and 7 32 bit Windows machines, because of SSDT hooks usage ( :] ), but we plan supporting other OSes.
+Actually, it works for XP 32 bit and 7 32 bit/64 bit Windows machines.
 
 CHANGELOG
 =========
+
+v0.7
++ x64 driver version
 
 v0.6
 + handle files deletion (through NtDeleteFile, NtCreateFile/NtClose via FILE_DELETE_ON_CLOSE and NtSetInformationFile)
@@ -68,8 +71,8 @@ Thus, if you find:
 
 Please just let us know !!! :]
 
-INSTALL/USE
-===========
+INSTALL/USE (x86 version)
+=========================
 
 To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo and prepare the host.
 
@@ -92,6 +95,36 @@ To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo 
 While submitting a new analysis, choose "kernelland" option on the Web interface, or use the option "kernel_analysis=yes" on commandline.
 
 Updating zer0m0n: edit then use the /bin/update_cuckoo.sh to update your cuckoo+zer0m0n installation :]
+
+INSTALL/USE (x64 version)
+=========================
+
+To patch cuckoo, you will need the files in the "bin" directory to patch cuckoo and prepare the host.
+
+ 1- First patch cuckoo using the .patch file, in order to support the driver.
+
+    - copy "cuckoo.patch" to your cuckoo root directory
+    
+    - run "patch -R -p1 < ./cuckoo.patch"
+    
+    - copy the "logs_dispatcher.exe" and "zer0m0n_x64.sys" files into your /cuckoo/analyzer/windows/dll/ folder
+
+ 2- Open your virtual machine, it MUST run a "Windows 7 x64" OS
+
+ 3- Run "disable_patchguard.bat" as administrator
+
+ 4- Disable UAC by ....  and restart the virtual machine
+
+ 5- At boot time, press F8 (to access the Advanced Boot Options) and choose "Disable Driver Signature Enforcement"  
+ 
+ 6- Install ActivePython 2.7 (http://www.activestate.com/activepython/downloads) 
+
+ 7- Run the "agent.py" script as usual
+
+ 8- Snapshot the VM
+
+While submitting a new analysis, choose "kernelland" option on the Web interface, or use the option "kernel_analysis=yes" on commandline. 
+
 
 SIGNATURES
 ==========
