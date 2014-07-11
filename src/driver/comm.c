@@ -40,7 +40,7 @@
 //		Filter communication connection callback.
 //	Parameters :
 //		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff541931(v=vs.85).aspx
-//	Return value :
+//	Return value
 //		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff541931(v=vs.85).aspx
 //	Process :
 //		Sets the global variable "clientPort" with the supplied client port communication.

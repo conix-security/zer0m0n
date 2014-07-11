@@ -144,6 +144,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	oldNtUserCallOneParam = NULL;
 	oldNtUserCallNoParam = NULL;
 	oldNtClose = NULL;
+	oldNtOpenFile = NULL;
 	
 	#ifdef DEBUG
 	DbgPrint("IOCTL_CUCKOO_PATH : 0x%08x\n", IOCTL_CUCKOO_PATH);
@@ -212,6 +213,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 		return STATUS_UNSUCCESSFUL;
 	}
 
+	
 	pDriverObject->DriverUnload = Unload;
 	return STATUS_SUCCESS;
 }

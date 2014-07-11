@@ -172,7 +172,10 @@ VOID unhook_ssdt_entries()
 		
 	if(oldNtClose != NULL)
 		(NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX) = oldNtClose;
-	
+		
+	/*if(oldNtOpenFile != NULL)
+		(NTOPENFILE)SYSTEMSERVICE(OPENFILE_INDEX) = oldNtOpenFile;
+	*/
 	enable_cr0();
 }
 
@@ -292,6 +295,9 @@ VOID unhook_ssdt_entries_7()
 	if(oldNtClose != NULL)
 		(NTCLOSE)SYSTEMSERVICE(CLOSE_7_INDEX) = oldNtClose;
 	
+	/*if(oldNtOpenFile != NULL)
+		(NTOPENFILE)SYSTEMSERVICE(OPENFILE_7_INDEX) = oldNtOpenFile;	
+	*/
 	enable_cr0();	
 }
 
@@ -401,6 +407,9 @@ VOID hook_ssdt_entries()
 	
 	oldNtClose = (NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX);
 	(NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX) = newNtClose;	
+	
+	oldNtOpenFile = (NTOPENFILE)SYSTEMSERVICE(OPENFILE_INDEX);
+	(NTOPENFILE)SYSTEMSERVICE(OPENFILE_INDEX) = newNtOpenFile;
 	
 	enable_cr0();
 }
@@ -521,6 +530,9 @@ VOID hook_ssdt_entries_7()
 	oldNtClose = (NTCLOSE)SYSTEMSERVICE(CLOSE_7_INDEX);
 	(NTCLOSE)SYSTEMSERVICE(CLOSE_7_INDEX) = newNtClose;
 	
+	oldNtOpenFile = (NTOPENFILE)SYSTEMSERVICE(OPENFILE_7_INDEX);
+	(NTOPENFILE)SYSTEMSERVICE(OPENFILE_7_INDEX) = newNtOpenFile;
+
 	enable_cr0();
 }
 
@@ -1818,6 +1830,127 @@ NTSTATUS newNtSystemDebugControl(SYSDBG_COMMAND Command, PVOID InputBuffer, ULON
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
+//		Logs file opening.
+//	Parameters :
+//		See http://msdn.microsoft.com/en-us/library/bb432381(v=vs.85).aspx
+//  Return value :
+//		See http://msdn.microsoft.com/en-us/library/bb432381(v=vs.85).aspx
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+NTSTATUS newNtOpenFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PIO_STATUS_BLOCK IoStatusBlock, ULONG ShareAccess, ULONG OpenOptions)
+{
+	NTSTATUS statusCall, exceptionCode;
+	ULONG currentProcessId, returnLength;
+	USHORT log_lvl = LOG_ERROR;
+	UNICODE_STRING full_path;
+	PWCHAR parameter = NULL;
+	POBJECT_NAME_INFORMATION nameInformation = NULL;
+
+	HANDLE kRootDirectory, kFileHandle;
+	UNICODE_STRING kObjectName;
+	
+	full_path.Buffer = NULL;
+	kObjectName.Buffer = NULL;
+	
+	currentProcessId = (ULONG)PsGetCurrentProcessId();	
+
+	statusCall = ((NTOPENFILE)(oldNtOpenFile))(FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, ShareAccess, OpenOptions);
+	
+	if(isProcessMonitoredByPid(currentProcessId) && ExGetPreviousMode() != KernelMode)
+	{
+		#ifdef DEBUG
+		DbgPrint("call NtOpenFile\n");
+		#endif
+		
+		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
+		kObjectName.Buffer = NULL;
+		
+		__try
+		{
+
+			ProbeForRead(FileHandle, sizeof(HANDLE), 1);
+			ProbeForRead(ObjectAttributes, sizeof(OBJECT_ATTRIBUTES), 1);
+			ProbeForRead(ObjectAttributes->ObjectName, sizeof(UNICODE_STRING), 1);
+			ProbeForRead(ObjectAttributes->ObjectName->Buffer, ObjectAttributes->ObjectName->Length, 1);
+		
+			kFileHandle = *FileHandle;
+			kRootDirectory = ObjectAttributes->RootDirectory;
+			kObjectName.Length = ObjectAttributes->ObjectName->Length;
+			kObjectName.MaximumLength = ObjectAttributes->ObjectName->MaximumLength;
+			kObjectName.Buffer = ExAllocatePoolWithTag(NonPagedPool, kObjectName.MaximumLength, BUFFER_TAG);
+			RtlCopyUnicodeString(&kObjectName, ObjectAttributes->ObjectName);
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			exceptionCode = GetExceptionCode();
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,ShareAccess->ERROR,OpenOptions->ERROR", exceptionCode)))
+				sendLogs(currentProcessId, L"ZwOpenFile", parameter);
+			else 
+				sendLogs(currentProcessId ,L"ZwOpenFile", L"0,-1,sssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,ShareAccess->ERROR,OpenOptions->ERROR");
+			ExFreePool(parameter);
+			if(kObjectName.Buffer)
+				ExFreePool(kObjectName.Buffer);
+			return statusCall;
+		}	
+
+		if(kRootDirectory)	// handle the not null rootdirectory case
+		{
+			// allocate both name information struct and unicode string buffer
+			nameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
+			if(nameInformation)
+			{
+				if(NT_SUCCESS(ZwQueryObject(kRootDirectory, ObjectNameInformation, nameInformation, MAXSIZE, NULL)))
+				{
+					full_path.MaximumLength = nameInformation->Name.Length + kObjectName.Length + 2 + sizeof(WCHAR);
+					full_path.Buffer = ExAllocatePoolWithTag(NonPagedPool, full_path.MaximumLength, BUFFER_TAG);
+					RtlZeroMemory(full_path.Buffer, full_path.MaximumLength);
+					RtlCopyUnicodeString(&full_path, &(nameInformation->Name));
+					RtlAppendUnicodeToString(&full_path, L"\\");
+					RtlAppendUnicodeStringToString(&full_path, &kObjectName);
+				}
+			}
+		}
+		else
+			RtlInitUnicodeString(&full_path, kObjectName.Buffer);
+
+		if(NT_SUCCESS(statusCall))
+		{
+			log_lvl = LOG_SUCCESS;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssss,FileHandle->0x%08x,FileName->%wZ,DesiredAccess->0x%08x,ShareAccess->%d,OpenOptions->%d", kFileHandle,&full_path, DesiredAccess, ShareAccess, OpenOptions)))
+				log_lvl = LOG_PARAM;
+		}
+		else
+		{
+			log_lvl = LOG_ERROR;
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,sssss,FileHandle->0x%08x,FileName->%wZ,DesiredAccess->0x%08x,ShareAccess->%d,OpenOptions->%d", statusCall, kFileHandle, &full_path, DesiredAccess, ShareAccess, OpenOptions)))
+				log_lvl = LOG_PARAM;
+		}
+		
+		switch(log_lvl)
+		{
+			case LOG_PARAM:
+				sendLogs(currentProcessId, L"ZwOpenFile", parameter);
+			break;
+			case LOG_SUCCESS:
+				sendLogs(currentProcessId, L"ZwOpenFile", L"0,-1,sssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,ShareAccess->ERROR,OpenOptions->ERROR");
+			break;
+			default:
+				sendLogs(currentProcessId, L"ZwOpenFile", L"1,0,sssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,ShareAccess->ERROR,OpenOptions->ERROR");
+			break;
+		}
+		if(kObjectName.Buffer && kObjectName.Buffer != full_path.Buffer)
+			ExFreePool(kObjectName.Buffer);
+		if(parameter != NULL)
+			ExFreePool(parameter);
+		if(nameInformation != NULL)
+			ExFreePool(nameInformation);
+		if(full_path.Buffer)
+			ExFreePool(full_path.Buffer);
+	}
+	return statusCall;
+}	
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	Description :
 //		Logs file creation and/or file opening.
 //	Parameters :
 //		See http://msdn.microsoft.com/en-us/library/windows/hardware/ff566424(v=vs.85).aspx
@@ -1885,10 +2018,10 @@ NTSTATUS newNtCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 		__except (EXCEPTION_EXECUTE_HANDLER)
 		{
 			exceptionCode = GetExceptionCode();
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR", exceptionCode)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"0,%d,ssssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR,Status->ERROR", exceptionCode)))
 				sendLogs(currentProcessId, L"ZwCreateFile", parameter);
 			else 
-				sendLogs(currentProcessId ,L"ZwCreateFile", L"0,-1,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR");
+				sendLogs(currentProcessId ,L"ZwCreateFile", L"0,-1,ssssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR,Status->ERROR");
 			ExFreePool(parameter);
 			if(kObjectName.Buffer)
 				ExFreePool(kObjectName.Buffer);
@@ -1917,18 +2050,18 @@ NTSTATUS newNtCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 			
 		if(NT_SUCCESS(statusCall))
 		{
-			// if CreateOptions == FILE_DELETE_ON_CLOSE && DesiredAccess == DELETE), add the handle to the linked list and remove the flags
+		// if CreateOptions == FILE_DELETE_ON_CLOSE && DesiredAccess == DELETE), add the handle to the linked list and remove the flags
 		if(handle_to_add)
 			addHandleInMonitoredList(kFileHandle);
 			
 			log_lvl = LOG_SUCCESS;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,sssssss,FileHandle->0x%08x,FileName->%wZ,DesiredAccess->0x%08x,CreateDisposition->%d,CreateOptions->%d,FileAttributes->%d,ShareAccess->%d", kFileHandle,&full_path, DesiredAccess, CreateDisposition, CreateOptions, FileAttributes, ShareAccess)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE, L"1,0,ssssssss,FileHandle->0x%08x,FileName->%wZ,DesiredAccess->0x%08x,CreateDisposition->%d,CreateOptions->%d,FileAttributes->%d,ShareAccess->%d,Status->%d", kFileHandle,&full_path, DesiredAccess, CreateDisposition, CreateOptions, FileAttributes, ShareAccess, IoStatusBlock->Information)))
 				log_lvl = LOG_PARAM;
 		}
 		else
 		{
 			log_lvl = LOG_ERROR;
-			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,sssssss,FileHandle->0x%08x,FileName->%wZ,DesiredAccess->0x%08x,CreateDisposition->%d,CreateOptions->%d,FileAttributes->%d,ShareAccess->%d", statusCall, kFileHandle, &full_path, DesiredAccess, CreateDisposition, CreateOptions, FileAttributes, ShareAccess)))
+			if(parameter && NT_SUCCESS(RtlStringCchPrintfW(parameter, MAXSIZE,  L"0,%d,ssssssss,FileHandle->0x%08x,FileName->%wZ,DesiredAccess->0x%08x,CreateDisposition->%d,CreateOptions->%d,FileAttributes->%d,ShareAccess->%d,Status->%d", statusCall, kFileHandle, &full_path, DesiredAccess, CreateDisposition, CreateOptions, FileAttributes, ShareAccess, IoStatusBlock->Information)))
 				log_lvl = LOG_PARAM;
 		}
 		
@@ -1938,10 +2071,10 @@ NTSTATUS newNtCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 				sendLogs(currentProcessId, L"ZwCreateFile", parameter);
 			break;
 			case LOG_SUCCESS:
-				sendLogs(currentProcessId, L"ZwCreateFile", L"0,-1,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwCreateFile", L"0,-1,ssssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR,Status->ERROR");
 			break;
 			default:
-				sendLogs(currentProcessId, L"ZwCreateFile", L"1,0,sssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR");
+				sendLogs(currentProcessId, L"ZwCreateFile", L"1,0,ssssssss,FileHandle->ERROR,FileName->ERROR,DesiredAccess->ERROR,CreateDisposition->ERROR,CreateOptions->ERROR,FileAttributes->ERROR,ShareAccess->ERROR,Status->ERROR");
 			break;
 		}
 		if(kObjectName.Buffer && kObjectName.Buffer != full_path.Buffer)
