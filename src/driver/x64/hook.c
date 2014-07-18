@@ -2857,7 +2857,7 @@ NTSTATUS newNtLoadDriver(PUNICODE_STRING DriverServiceName)
 	{
 		if(ExGetPreviousMode() != KernelMode)
 			ProbeForRead(DriverServiceName, sizeof(UNICODE_STRING), 1);
-		kDriverServiceName = *DriverServiceName;
+		RtlCopyUnicodeString(&kDriverServiceName, DriverServiceName);
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
