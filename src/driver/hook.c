@@ -173,9 +173,9 @@ VOID unhook_ssdt_entries()
 	if(oldNtClose != NULL)
 		(NTCLOSE)SYSTEMSERVICE(CLOSE_INDEX) = oldNtClose;
 		
-	/*if(oldNtOpenFile != NULL)
+	if(oldNtOpenFile != NULL)
 		(NTOPENFILE)SYSTEMSERVICE(OPENFILE_INDEX) = oldNtOpenFile;
-	*/
+	
 	enable_cr0();
 }
 
@@ -295,9 +295,9 @@ VOID unhook_ssdt_entries_7()
 	if(oldNtClose != NULL)
 		(NTCLOSE)SYSTEMSERVICE(CLOSE_7_INDEX) = oldNtClose;
 	
-	/*if(oldNtOpenFile != NULL)
+	if(oldNtOpenFile != NULL)
 		(NTOPENFILE)SYSTEMSERVICE(OPENFILE_7_INDEX) = oldNtOpenFile;	
-	*/
+	
 	enable_cr0();	
 }
 
@@ -2937,7 +2937,8 @@ NTSTATUS newNtLoadDriver(PUNICODE_STRING DriverServiceName)
 	{
 		if(ExGetPreviousMode() != KernelMode)
 			ProbeForRead(DriverServiceName, sizeof(UNICODE_STRING), 1);
-		kDriverServiceName = *DriverServiceName;
+		
+		RtlCopyUnicodeString(&kDriverServiceName, DriverServiceName);
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
