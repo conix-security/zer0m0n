@@ -2,11 +2,12 @@ zer0m0n v0.7 (DEVELOPMENT BRANCH)
 =================================
 
 To-do :
-+ Eliminate bugs :]
++ NtCreateThreadEx x64
++ Use cuckoomon syscalls logs
++ Dynamic-static analysis integration
++ Sandalone (procmon-like) version :]
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
-+ Add monitored functions/events
 + fix random socket desynch
-+ etc.
 
 v0.7 changes :
 + x64 driver version !!
