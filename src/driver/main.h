@@ -46,7 +46,16 @@
 /////////////////////////////////////////////////////////////////////////////
 
 // Uncomment to enable kernel debugging output
-//#define DEBUG
+#define DEBUG
+#ifdef DEBUG
+	#define Dbg(format, ...)                                          \
+	do {                                                              \
+		DbgPrint (__FUNCTION__ ") " format "\n", ##__VA_ARGS__);      \
+	} while (0)
+#else
+	#define Dbg(format, ...) \
+		;
+#endif
 
 // Memory tags
 #define PROC_POOL_TAG 		'prcT'

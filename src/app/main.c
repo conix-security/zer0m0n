@@ -202,9 +202,10 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 				log.g_sock = log_init(g_config.host_ip, g_config.host_port, 0);
 				status = connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr));
 				i=0;
-				if(status)
+				while(status)
 				{
 					pipe("KERROR: (%d TRY) Could not connect %d socket : %x ip : %d.%d.%d.%d port : %d (%d given)\n", i, WSAGetLastError(), log.g_sock, addr.sin_addr.S_un.S_un_b.s_b1, addr.sin_addr.S_un.S_un_b.s_b2, addr.sin_addr.S_un.S_un_b.s_b3, addr.sin_addr.S_un.S_un_b.s_b4, ntohs(addr.sin_port), g_config.host_port); 
+					Sleep(2000);
 					status = connect(log.g_sock, (struct sockaddr *) &addr, sizeof(addr));
 					i++;
 				}
@@ -272,7 +273,7 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		if(log.nb_arguments)
 			log.arguments = (PARAMETERS*)malloc(log.nb_arguments * sizeof(PARAMETERS));
 		
-		// for the moment, we only have 7 arguments/values maximum to log
+		// for the moment, we only have 8 arguments/values maximum to log
 		switch(log.nb_arguments)
 		{
 			case 0:
@@ -283,7 +284,8 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 			case 1:
 				retrieve_parameters(log.nb_arguments, msg->message, ptr_msg, size, log.arguments);
 				i = log_resolve_index(log.funcname, 0);
-				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value);
+				if(strcmp(log.funcname, "DumpPage")) // don't log when we have to dump a page !	
+					loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value);
 			break;
 			
 			case 2:
@@ -322,10 +324,28 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value,log.arguments[5].arg,log.arguments[5].value,log.arguments[6].arg,log.arguments[6].value);
 			break;
 
+			case 8:
+				retrieve_parameters(log.nb_arguments, msg->message, ptr_msg, size, log.arguments);
+				i = log_resolve_index(log.funcname, 0);
+				loq(log.g_sock,i,log.funcname,log.success,log.ret,log.fmt,log.arguments[0].arg,log.arguments[0].value,log.arguments[1].arg,log.arguments[1].value,log.arguments[2].arg,log.arguments[2].value,log.arguments[3].arg,log.arguments[3].value,log.arguments[4].arg,log.arguments[4].value,log.arguments[5].arg,log.arguments[5].value,log.arguments[6].arg,log.arguments[6].value,log.arguments[7].arg, log.arguments[7].value);
+			break;
+
 			default:
 				break;
 		}
 		
+		// if the log contains "DumpPage" as function name, notifies cuckoo that a file has to be dumpped
+		if(!strcmp(log.funcname, "DumpPage") && !log.ret)
+		{ 
+			us_pathfile = (PUNICODE_STRING)malloc(1024*sizeof(UNICODE_STRING));
+			pw_pathfile = (PWCHAR)malloc(1024*sizeof(WCHAR));
+			mbstowcs(pw_pathfile, log.arguments[0].value, strlen(log.arguments[0].value)+1);
+			RtlInitUnicodeString(us_pathfile, pw_pathfile);
+			new_file(us_pathfile);
+			free(us_pathfile);
+			free(pw_pathfile);
+		}
+
 		// if the log contains "ZwWriteFile" as function name, notifies cuckoo that a file has to be dumpped
 		if(!strcmp(log.funcname, "ZwWriteFile") && !log.ret)
 		{ 
@@ -375,11 +395,11 @@ VOID parse_logs(PTHREAD_CONTEXT p)
 		}
 
 		// if a driver is loaded, notifies cuckoo to stop the analysis
-		if(!strcmp(log.funcname, "LOAD_DRIVER"))
+		/*if(!strcmp(log.funcname, "LOAD_DRIVER"))
 		{
 			printf("DRIVER LOADED ! Terminating analysis...\n");
 			pipe("KSUBVERT");
-		}
+		}*/
 
 		// if a shutdown/reboot is attempted, notifies cuckoo to stop the analysis
 		if(!strcmp(log.funcname, "ZwUserCallOneParam") || !strcmp(log.funcname, "ZwUserCallNoParam"))

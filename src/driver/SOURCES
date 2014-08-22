@@ -6,4 +6,5 @@ DRIVERTYPE = FS
 TARGETLIBS= $(TARGETLIBS) \
             $(IFSKIT_LIB_PATH)\fltMgr.lib
 
-SOURCES = callbacks.c comm.c hook.c main.c monitor.c reg.c utils.c
+SOURCES = callbacks.c comm.c hook.c main.c monitor.c reg.c utils.c \
+			stack_unwind.c module.c query_information.c page_dump.c
