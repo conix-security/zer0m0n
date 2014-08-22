@@ -34,6 +34,7 @@
 #include "utils.h"
 #include "monitor.h"
 #include "comm.h"
+#include "stack_unwind.h"
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //	Description :
@@ -592,6 +593,8 @@ NTSTATUS newNtOpenThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJEC
 	
 	if(isProcessMonitoredByPid(currentProcessId) && ExGetPreviousMode() != KernelMode)
 	{
+		GenericStackUnwind (__FUNCTION__);
+		
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
 		#ifdef DEBUG
@@ -756,6 +759,8 @@ NTSTATUS newNtOpenProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJ
 	if(isProcessMonitoredByPid(currentProcessId) && ExGetPreviousMode() != KernelMode)
 	{   	
 	
+		GenericStackUnwind (__FUNCTION__);
+		
 		#ifdef DEBUG
 		DbgPrint("call ZwOpenProcess\n");
 		#endif
@@ -1014,7 +1019,9 @@ NTSTATUS newNtReadVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID B
 		#ifdef DEBUG
 		DbgPrint("call ZwReadVirtualMemory\n");
 		#endif
-		
+	
+		GenericStackUnwind (__FUNCTION__);
+			
 		targetProcessId = getPIDByHandle(ProcessHandle);
 		
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
@@ -1076,6 +1083,8 @@ NTSTATUS newNtWriteVirtualMemory(HANDLE ProcessHandle, PVOID BaseAddress, PVOID 
 		DbgPrint("call ZwWriteVirtualMemory\n");
 		#endif
 		
+		GenericStackUnwind (__FUNCTION__);
+			
 		targetProcessId = getPIDByHandle(ProcessHandle);
 		
 		if(NT_SUCCESS(statusCall) && targetProcessId)
@@ -1201,7 +1210,9 @@ NTSTATUS newNtCreateSection(PHANDLE SectionHandle, ACCESS_MASK DesiredAccess, PO
 		#ifdef DEBUG
 		DbgPrint("call ZwCreateSection\n");
 		#endif
-		
+	
+		GenericStackUnwind (__FUNCTION__);
+			
 		if((AllocationAttributes & 0x1000000/*SEC_IMAGE*/) && (SectionPageProtection & PAGE_EXECUTE) && FileHandle)
 		{
 			parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
@@ -1258,7 +1269,9 @@ NTSTATUS newNtCreateProcess(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, PO
 		#ifdef DEBUG
 		DbgPrint("call ZwCreateProcess\n");
 		#endif
-		
+	
+		GenericStackUnwind (__FUNCTION__);
+			
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
 		__try 
@@ -1337,7 +1350,9 @@ NTSTATUS newNtCreateProcessEx(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, 
 		#ifdef DEBUG
 		DbgPrint("call ZwCreateProcessEx\n");
 		#endif
-		
+	
+		GenericStackUnwind (__FUNCTION__);
+			
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
 		__try 
@@ -1481,11 +1496,9 @@ NTSTATUS newNtCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJ
 	ULONG currentProcessId, targetProcessId, createdThreadId;
 	USHORT log_lvl = LOG_ERROR;
 	PWCHAR parameter = NULL;
-	
 	HANDLE kThreadHandle;
 	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
-	
 	targetProcessId = getPIDByHandle(ProcessHandle);	// faster than placing it after the monitored process check
 	statusCall = ((NTCREATETHREAD)(oldNtCreateThread))(ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, ClientID, ThreadContext, InitialTeb, CreateSuspended);
 	
@@ -1494,7 +1507,9 @@ NTSTATUS newNtCreateThread(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, POBJ
 		#ifdef DEBUG
 		DbgPrint("call ZwCreateThread\n");
 		#endif
-		
+	
+		GenericStackUnwind (__FUNCTION__);
+			
 		if(NT_SUCCESS(statusCall) && targetProcessId)
 			startMonitoringProcess(targetProcessId);	// <-- RACE CONDITION
 		
@@ -1567,11 +1582,9 @@ NTSTATUS newNtCreateThreadEx(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, PO
 	ULONG currentProcessId, targetProcessId, createdThreadId;
 	USHORT log_lvl = LOG_ERROR;
 	PWCHAR parameter = NULL;
-	
 	HANDLE kThreadHandle;
 	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
-	
 	targetProcessId = getPIDByHandle(ProcessHandle);	// faster than placing it after the monitored process check
 	statusCall = ((NTCREATETHREADEX)(oldNtCreateThreadEx))(ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, StartAddress, Parameter, CreateSuspended, StackZeroBits, SizeOfStackCommit, SizeOfStackReserve, BytesBuffer);
 	
@@ -1580,7 +1593,9 @@ NTSTATUS newNtCreateThreadEx(PHANDLE ThreadHandle, ACCESS_MASK DesiredAccess, PO
 		#ifdef DEBUG
 		DbgPrint("call ZwCreateThreadEx\n");
 		#endif
-		
+	
+		GenericStackUnwind (__FUNCTION__);
+			
 		if(NT_SUCCESS(statusCall) && targetProcessId)
 			startMonitoringProcess(targetProcessId);	// <-- RACE CONDITION
 		
@@ -1666,6 +1681,9 @@ NTSTATUS newNtMapViewOfSection(HANDLE SectionHandle, HANDLE ProcessHandle, PVOID
 		
 		if(currentProcessId != targetProcessId)
 		{
+		
+			GenericStackUnwind (__FUNCTION__);
+		
 			#ifdef DEBUG
 			DbgPrint("call ZwMapViewOfSection\n");
 			#endif
@@ -1731,6 +1749,8 @@ NTSTATUS newNtSetContextThread(HANDLE ThreadHandle, PCONTEXT Context)
 		#ifdef DEBUG
 		DbgPrint("call ZwSetContextThread\n");
 		#endif
+	
+		GenericStackUnwind (__FUNCTION__);
 		
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
@@ -1975,8 +1995,8 @@ NTSTATUS newNtCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 	
 	full_path.Buffer = NULL;
 	kObjectName.Buffer = NULL;
-	
 	handle_to_add = FALSE;
+	
 	currentProcessId = (ULONG)PsGetCurrentProcessId();
 	
 	if((CreateOptions & FILE_DELETE_ON_CLOSE) && (DesiredAccess & DELETE))
@@ -1995,7 +2015,9 @@ NTSTATUS newNtCreateFile(PHANDLE FileHandle, ACCESS_MASK DesiredAccess, POBJECT_
 		#ifdef DEBUG
 		DbgPrint("call ZwCreateFile\n");
 		#endif
-		
+	
+		GenericStackUnwind (__FUNCTION__);
+			
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		kObjectName.Buffer = NULL;
 		
@@ -2626,6 +2648,9 @@ NTSTATUS newNtCreateMutant(PHANDLE MutantHandle, ACCESS_MASK DesiredAccess, POBJ
 		#ifdef DEBUG
 		DbgPrint("call ZwCreateMutant\n");
 		#endif
+	
+		GenericStackUnwind (__FUNCTION__);
+		
 		parameter = ExAllocatePoolWithTag(NonPagedPool, (MAXSIZE+1)*sizeof(WCHAR), PROC_POOL_TAG);
 		
 		__try
@@ -3121,6 +3146,8 @@ NTSTATUS newNtQueryValueKey(HANDLE KeyHandle, PUNICODE_STRING ValueName, KEY_VAL
 		DbgPrint("call ZwQueryValueKey\n");
 		#endif
 		
+		GenericStackUnwind (__FUNCTION__);
+			
 		if(NT_SUCCESS(statusCall))
 		{
 			if(ValueName->Buffer)
@@ -3402,7 +3429,9 @@ NTSTATUS newNtClose(HANDLE Handle)
 		#ifdef DEBUG
 		DbgPrint("call ZwClose() !\n");
 		#endif
-		
+	
+		GenericStackUnwind (__FUNCTION__);
+			
 		// retrieve filename from handle
 		originalNameInformation = ExAllocatePoolWithTag(NonPagedPool, MAXSIZE, BUFFER_TAG);
 		if(originalNameInformation)

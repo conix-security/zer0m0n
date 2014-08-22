@@ -1,4 +1,4 @@
-zer0m0n v0.7 (DEVELOPMENT BRANCH)
+zer0m0n v0.9 (DEVELOPMENT BRANCH)
 =================================
 
 To-do :
@@ -8,6 +8,13 @@ To-do :
 + Sandalone (procmon-like) version :]
 + Use inverted IRP calls with kernel buffer instead of filter comm. ports :]
 + fix random socket desynch
++ code cleaning
+
+v0.9 changes :
+
+
+v0.8 changes :
++ Dump a physical page of memory when an unknown region of code is executed. (x86-32 only)
 
 v0.7 changes :
 + x64 driver version !!
