@@ -1,4 +1,4 @@
-zer0m0n v0.7
+zer0m0n v0.8
 ============
 
 zer0m0n is a driver for Cuckoo Sandbox, it will perform kernel analysis during the execution of a malware. There are many ways for a malware author to bypass Cuckoo detection, he can detect the hooks, hardcodes the Nt* functions to avoid the hooks, detect the virtual machine... The goal of this driver is to offer the possibility for the user to choose between the classical userland analysis or a kernel analysis, which will be harder to detect or bypass.
@@ -7,6 +7,9 @@ Actually, it works for XP 32 bit and 7 32 bit/64 bit Windows machines.
 
 CHANGELOG
 =========
+
+v0.8
++ dump a physical page of memory when an unknown region of code is executed. (x86-32 only)
 
 v0.7
 + x64 driver version
