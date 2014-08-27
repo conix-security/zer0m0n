@@ -460,6 +460,8 @@ GenericStackUnwind (
 		case STACK_UNWIND_UNTRUSTED_CALLCHAIN:
 			Dbg ("%s called by an untrusted call chain (RetEip=0x%08X).", 
 				FunctionName, LastRetEip);
+			// Handle this event the same way than an unknown module
+			UnknownModuleHandler (LastRetEip);
 		break;
 
 		case STACK_UNWIND_INVALID_SFP :
