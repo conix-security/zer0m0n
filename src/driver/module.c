@@ -235,7 +235,8 @@ AddressInModuleTableEntry (
 	IN DWORD Address,
 	IN PMODULE_ENTRY pModuleTableEntry
 ) {
-	return ((Address >=  (DWORD) pModuleTableEntry->BaseAddress)
+	return ((pModuleTableEntry != NULL)
+	    &&  (Address >=  (DWORD) pModuleTableEntry->BaseAddress)
 		&&  (Address <= ((DWORD) pModuleTableEntry->BaseAddress + pModuleTableEntry->SizeOfImage))
 	);
 }
