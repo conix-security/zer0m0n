@@ -222,13 +222,12 @@ GetModuleTableEntry (
 //		Checks if the given address is in the given module
 //
 //	Parameters :
-//		IN DWORD Address										An address to check
-//		IN PMODULE_INFORMATION_TABLE ModuleInformationTable		A pointer to an allocated MODULE_INFORMATION_TABLE
+//		IN DWORD Address							An address to check
+//      IN PMODULE_ENTRY pModuleTableEntry          A pointer to an allocated MODULE_ENTRY
 //	Return value :
 //		PMODULE_ENTRY	A pointer to the PMODULE_ENTRY depending of the address given
 //							Returns NULL if the module hasn't been found.
 //	Process :
-//		Parse for each entry the base address and the size of the module
 //		Check if the given address is in bound of the module
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 BOOLEAN
