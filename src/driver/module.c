@@ -43,7 +43,7 @@
 //		Allocate and fill a PMODULE_INFORMATION_TABLE structure depending of the information given in the PEB
 //		It also retrieves information from the system modules and add them to the table
 //	Parameters :
-//		IN ULONG Pid	The targeted process ID	
+//		IN ULONG Pid	The targeted process ID
 //		IN PPEB pPeb	An allocated PEB pointer
 //	Return value :
 //		PMODULE_INFORMATION_TABLE	An allocated PMODULE_INFORMATION_TABLE containing the information about the modules
@@ -96,6 +96,8 @@ CreateModuleInformation (
 	// Allocate a MODULE_INFORMATION_TABLE
 	if ((pModuleInformationTable = ExAllocatePoolWithTag (NonPagedPool, sizeof (MODULE_INFORMATION_TABLE), 'CMI')) == NULL) {
 		Dbg ("Cannot allocate a MODULE_INFORMATION_TABLE.");
+		// Cleaning
+		ExFreePool (pSystemModuleInformation);
 		return NULL;
 	}
 
@@ -104,6 +106,9 @@ CreateModuleInformation (
 			NonPagedPool, Count * sizeof (MODULE_ENTRY), 'CMI2')
 		) == NULL) {
 		Dbg ("Cannot allocate a MODULE_INFORMATION_TABLE.");
+		// Cleaning
+		ExFreePool (pModuleInformationTable);
+		ExFreePool (pSystemModuleInformation);
 		return NULL;
 	}
 
@@ -177,6 +182,15 @@ CreateModuleInformation (
 		}
 	}
 
+	// ImageModule should have been detected from this point, check it
+	if (pModuleInformationTable->ImageModule == NULL) {
+		Dbg ("No ImageBaseAddress detected from the modules list.");
+		// Cleaning
+		FreeModuleInformationTable (pModuleInformationTable);
+		ExFreePool (pSystemModuleInformation);
+		return NULL;
+	}
+	
 	// Cleaning
 	ExFreePool (pSystemModuleInformation);
 
