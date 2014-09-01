@@ -43,7 +43,7 @@
 //		Allocate and fill a PMODULE_INFORMATION_TABLE structure depending of the information given in the PEB
 //		It also retrieves information from the system modules and add them to the table
 //	Parameters :
-//		IN ULONG Pid	The targeted process ID	
+//		IN ULONG Pid	The targeted process ID
 //		IN PPEB pPeb	An allocated PEB pointer
 //	Return value :
 //		PMODULE_INFORMATION_TABLE	An allocated PMODULE_INFORMATION_TABLE containing the information about the modules
@@ -96,6 +96,8 @@ CreateModuleInformation (
 	// Allocate a MODULE_INFORMATION_TABLE
 	if ((pModuleInformationTable = ExAllocatePoolWithTag (NonPagedPool, sizeof (MODULE_INFORMATION_TABLE), 'CMI')) == NULL) {
 		Dbg ("Cannot allocate a MODULE_INFORMATION_TABLE.");
+		// Cleaning
+		ExFreePool (pSystemModuleInformation);
 		return NULL;
 	}
 
@@ -104,6 +106,9 @@ CreateModuleInformation (
 			NonPagedPool, Count * sizeof (MODULE_ENTRY), 'CMI2')
 		) == NULL) {
 		Dbg ("Cannot allocate a MODULE_INFORMATION_TABLE.");
+		// Cleaning
+		ExFreePool (pModuleInformationTable);
+		ExFreePool (pSystemModuleInformation);
 		return NULL;
 	}
 
@@ -177,6 +182,15 @@ CreateModuleInformation (
 		}
 	}
 
+	// ImageModule should have been detected from this point, check it
+	if (pModuleInformationTable->ImageModule == NULL) {
+		Dbg ("No ImageBaseAddress detected from the modules list.");
+		// Cleaning
+		FreeModuleInformationTable (pModuleInformationTable);
+		ExFreePool (pSystemModuleInformation);
+		return NULL;
+	}
+	
 	// Cleaning
 	ExFreePool (pSystemModuleInformation);
 
@@ -222,13 +236,12 @@ GetModuleTableEntry (
 //		Checks if the given address is in the given module
 //
 //	Parameters :
-//		IN DWORD Address										An address to check
-//		IN PMODULE_INFORMATION_TABLE ModuleInformationTable		A pointer to an allocated MODULE_INFORMATION_TABLE
+//		IN DWORD Address							An address to check
+//      IN PMODULE_ENTRY pModuleTableEntry          A pointer to an allocated MODULE_ENTRY
 //	Return value :
 //		PMODULE_ENTRY	A pointer to the PMODULE_ENTRY depending of the address given
 //							Returns NULL if the module hasn't been found.
 //	Process :
-//		Parse for each entry the base address and the size of the module
 //		Check if the given address is in bound of the module
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 BOOLEAN
@@ -236,7 +249,8 @@ AddressInModuleTableEntry (
 	IN DWORD Address,
 	IN PMODULE_ENTRY pModuleTableEntry
 ) {
-	return ((Address >=  (DWORD) pModuleTableEntry->BaseAddress)
+	return ((pModuleTableEntry != NULL)
+	    &&  (Address >=  (DWORD) pModuleTableEntry->BaseAddress)
 		&&  (Address <= ((DWORD) pModuleTableEntry->BaseAddress + pModuleTableEntry->SizeOfImage))
 	);
 }
